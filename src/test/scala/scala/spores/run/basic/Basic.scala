@@ -2,6 +2,7 @@ package scala.spores
 package run
 package basic
 
+import scala.spores.Spore._
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
