@@ -1,4 +1,5 @@
 package scala.spores
+package run
 package basic
 
 import org.junit.Test
