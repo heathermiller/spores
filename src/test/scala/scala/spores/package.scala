@@ -1,9 +1,9 @@
-package scala
+package scala.spores
 
 import reflect._
 import tools.reflect.{ToolBox, ToolBoxError}
 
-package object spores {
+object util {
 
 
   implicit class objectops(obj: Any) {

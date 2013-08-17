@@ -5,15 +5,22 @@ package basic
 import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
 import org.junit.Test
+import util._
 
 @RunWith(classOf[JUnit4])
 class NegSpec {
   @Test
-  def `missing symbol`() {
-    expectError("not found: value kaboom") {
+  def `wrong shape, incorrect val def list`() {
+    expectError("Only val defs allowed at this position") {
       """
-        | kaboom
-      """.stripMargin
+        import scala.spores._
+        val v1 = 10
+        val s: Spore[Int, Unit] = spore {
+          val c1 = v1
+          println("hi")
+          (x: Int) => println(s"arg: $x, c1: $c1")
+        }
+      """
     }
   }
 }
