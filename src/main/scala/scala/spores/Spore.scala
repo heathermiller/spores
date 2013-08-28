@@ -31,3 +31,7 @@ class Spore2Impl[-T1, -T2, +R](f: (T1, T2) => R) extends Spore2[T1, T2, R] {
 class Spore3Impl[-T1, -T2, -T3, +R](f: (T1, T2, T3) => R) extends Spore3[T1, T2, T3, R] {
   def apply(x1: T1, x2: T2, x3: T3): R = f(x1, x2, x3)
 }
+
+object Spore {
+  def capture[T](x: T): T = x
+}

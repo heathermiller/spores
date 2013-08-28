@@ -5,6 +5,7 @@ package basic
 import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
 import org.junit.Test
+
 import util._
 
 @RunWith(classOf[JUnit4])
@@ -23,4 +24,36 @@ class NegSpec {
       """
     }
   }
+
+  @Test
+  def `only allowed to capture paths 1`() {
+    expectError("Only stable paths can be captured") {
+      """
+        import scala.spores._
+        import Spore.capture
+        def compute(x: Int): Int = x * 5
+        val s: Spore[Int, String] = spore { (x: Int) =>
+          val cc1 = capture(compute(2))
+          s"arg: $x, cc1: $cc1"
+        }
+      """
+    }
+  }
+
+  @Test
+  def `only allowed to capture paths 2`() {
+    expectError("Only stable paths can be captured") {
+      """
+        import scala.spores._
+        import Spore.capture
+        // this is a var:
+        var v1: Int = 10
+        val s: Spore[Int, String] = spore { (x: Int) =>
+          val cc1 = capture(v1)
+          s"arg: $x, cc1: $cc1"
+        }
+      """
+    }
+  }
+
 }

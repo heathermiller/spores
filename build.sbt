@@ -18,3 +18,5 @@ libraryDependencies += "junit" % "junit-dep" % "4.10" % "test"
 libraryDependencies += "com.novocode" % "junit-interface" % "0.10-M2" % "test"
 
 testOptions += Tests.Argument(TestFrameworks.JUnit, "-q", "-v", "-s")
+
+scalacOptions in Test ++= Seq("-Xlog-implicits"/*, "-Ybrowse:typer"*/)

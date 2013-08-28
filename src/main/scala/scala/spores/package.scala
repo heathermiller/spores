@@ -31,6 +31,8 @@ package object spores {
 
   def spore[T1, T2, T3, R](fun: (T1, T2, T3) => R): Spore3[T1, T2, T3, R] = macro spore3Impl[T1, T2, T3, R]
 
+  implicit def mkSpore[T, R](fun: T => R): Spore[T, R] = macro sporeImpl[T, R]
+
   def delayed[T](body: T): Function0[T] = macro delayedImpl[T]
 
   def delayedImpl[T: c.WeakTypeTag](c: Context)(body: c.Expr[T]): c.Expr[Function0[T]] = {
@@ -76,16 +78,46 @@ package object spores {
         (List(), expr)
     }
 
+    val captureDef = typeOf[Spore.type].member(newTermName("capture"))
+
     funLiteral match {
       case fun @ Function(vparams, body) =>
 
+        var capturedSyms = List[Symbol]()
+
         def isSymbolValid(s: Symbol): Boolean =
           validEnv.contains(s) ||
+          capturedSyms.contains(s) ||
           s.owner == fun.symbol ||
           s.isStatic || {
             c.error(s.pos, "invalid reference to " + s)
             false
           }
+
+        def isStablePath(t: Tree): Boolean = t match {
+          case sel @ Select(s, _) =>
+            isStablePath(s) && sel.symbol.asTerm.isStable
+          case id: Ident =>
+            id.symbol.asTerm.isStable
+          case _ =>
+            false
+        }
+
+        // traverse and collect captured symbols
+        val collectCapturedTraverser = new Traverser {
+          override def traverse(tree: Tree): Unit = tree match {
+            case app @ Apply(fun, List(captured)) if (fun.symbol == captureDef) =>
+              debug("found capture: " + app)
+              if (!isStablePath(captured))
+                c.error(captured.pos, "Only stable paths can be captured")
+              else
+                capturedSyms ::= captured.symbol
+            case _ =>
+              super.traverse(tree)
+          }
+        }
+        debug("collecting captured symbols")
+        collectCapturedTraverser.traverse(body)
 
         debug(s"checking $body...")
         val traverser = new Traverser {
