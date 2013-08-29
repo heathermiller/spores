@@ -37,8 +37,6 @@ package object spores {
 
   def delayedImpl[T: c.WeakTypeTag](c: Context)(body: c.Expr[T]): c.Expr[Function0[T]] = {
     import c.universe._
-
-
     // check Spore constraints
     //check(c)(fun.tree)
 
@@ -47,18 +45,18 @@ package object spores {
     }
   }
 
+  private val isDebugEnabled = false
+  private def debug(s: => String): Unit =
+    if (isDebugEnabled) println(s)
+
   /**
      spore {
        val x = outer
        (y: T) => { ... }
      }
    */
-  private def check[C <: Context with Singleton](c: Context)(funTree: c.Tree): Unit = {
+  private def check(c: Context)(funTree: c.Tree): Unit = {
     import c.universe._
-
-    val isDebugEnabled = false
-    def debug(s: => String): Unit =
-      if (isDebugEnabled) println(s)
 
     // traverse body of `fun` and check that the free vars access only allowed things
     val (validEnv, funLiteral) = funTree match {
@@ -78,13 +76,15 @@ package object spores {
         (List(), expr)
     }
 
-    val captureDef = typeOf[Spore.type].member(newTermName("capture"))
+    val captureSym = typeOf[Spore.type].member(newTermName("capture"))
 
     funLiteral match {
       case fun @ Function(vparams, body) =>
 
+        // contains all symbols found in `capture` syntax
         var capturedSyms = List[Symbol]()
 
+        // is the use of symbol s allowed via spore rules? (in the spore body)
         def isSymbolValid(s: Symbol): Boolean =
           validEnv.contains(s) ||
           capturedSyms.contains(s) ||
@@ -94,6 +94,8 @@ package object spores {
             false
           }
 
+        // is tree t a path with only stable components?
+        // TODO, also valid is usage of `this` and `super` according to SLS 3.6
         def isStablePath(t: Tree): Boolean = t match {
           case sel @ Select(s, _) =>
             isStablePath(s) && sel.symbol.asTerm.isStable
@@ -103,10 +105,10 @@ package object spores {
             false
         }
 
-        // traverse and collect captured symbols
+        // traverse the spore body and collect symbols in `capture` invocations
         val collectCapturedTraverser = new Traverser {
           override def traverse(tree: Tree): Unit = tree match {
-            case app @ Apply(fun, List(captured)) if (fun.symbol == captureDef) =>
+            case app @ Apply(fun, List(captured)) if (fun.symbol == captureSym) =>
               debug("found capture: " + app)
               if (!isStablePath(captured))
                 c.error(captured.pos, "Only stable paths can be captured")
@@ -120,6 +122,8 @@ package object spores {
         collectCapturedTraverser.traverse(body)
 
         debug(s"checking $body...")
+        // check the spore body, ie for all identifiers, check that they are valid according to spore rules
+        // ie, either declared locally or captured via a `capture` invocation
         val traverser = new Traverser {
           override def traverse(tree: Tree) {
             tree match {
@@ -184,13 +188,9 @@ package object spores {
     }
   }
 
-
-  private def checkTc[C <: Context with Singleton](c: Context)(funTree: c.Tree): List[c.Type] = {
+  // type constraint checking idea
+  private def checkTc(c: Context)(funTree: c.Tree): List[c.Type] = {
     import c.universe._
-
-    val isDebugEnabled = true
-    def debug(s: => String): Unit =
-      if (isDebugEnabled) println(s)
 
     // traverse body of `fun` and check that the free vars access only allowed things
     val (validEnv, funLiteral) = funTree match {
@@ -265,6 +265,7 @@ package object spores {
     validEnv map { _._2 }
   }
 
+  // sketch involved with type constraints, probably unneeded
   def sporeWith[T, R](fun: T => R): Spore[T, R] = macro sporeTcImpl[T, R]
 
   def sporeTcImpl[T: c.WeakTypeTag, R: c.WeakTypeTag](c: Context)(fun: c.Expr[T => R]): c.Expr[Spore[T, R]] = {
