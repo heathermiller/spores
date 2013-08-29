@@ -72,4 +72,33 @@ class StablePathNegSpec {
       """
     }
   }
+
+  @Test
+  def `1 isn't a stable path`() {
+    expectError("Only stable paths can be captured") {
+      """
+        import scala.spores._
+        import Spore.capture
+        val s: Spore[Int, String] = spore { (x: Int) =>
+          val capt = capture(1)
+          s"$capt"
+        }
+      """
+    }
+  }
+
+  @Test
+  def `can't ascribe types in a stable path`() {
+    expectError("Only stable paths can be captured") {
+      """
+        import scala.spores._
+        import Spore.capture
+        val v = 10
+        val s: Spore[Int, String] = spore { (x: Int) =>
+          val capt = capture(v: Any)
+          s"$capt"
+        }
+      """
+    }
+  }
 }

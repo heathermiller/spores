@@ -25,6 +25,12 @@ class SuperTest {
   val name = "super test"
 }
 
+package stablePathPkg {
+  object StablePathObj {
+    val kitteh = "i can haz stable path"
+  }
+}
+
 @RunWith(classOf[JUnit4])
 class StablePathSpec extends SuperTest {
   override val name = "stable path spec"
@@ -34,10 +40,10 @@ class StablePathSpec extends SuperTest {
   def `can capture this in a stable path`() {
     import Spore.capture
     val s: Spore[Int, String] = spore {
-      (x: Int) => s"arg: $x, c1: ${capture(this.v0)}"
+      (x: Int) => s"${capture(this.v0)}"
     }
 
-    assert(s(20) == "arg: 20, c1: 12")
+    assert(s(42) == "12")
   }
 
   // we can't seem to have a super in paths because of S-1938, pity
@@ -51,4 +57,27 @@ class StablePathSpec extends SuperTest {
 
   //   assert(s(20) == "arg: 20, c1: super test")
   // }
+
+  @Test
+  def `can capture an innocuous simple stable path`() {
+    import Spore.capture
+    object Innocuous {
+      val cute = "fluffy"
+    }
+    val s: Spore[Int, String] = spore {
+      (x: Int) => s"${capture(Innocuous.cute)}"
+    }
+
+    assert(s(42) == "fluffy")
+  }
+
+  @Test
+  def `can capture an innocuous stable path in a package`() {
+    import Spore.capture
+    val s: Spore[Int, String] = spore {
+      (x: Int) => s"${capture(stablePathPkg.StablePathObj.kitteh)}"
+    }
+
+    assert(s(42) == "i can haz stable path")
+  }
 }

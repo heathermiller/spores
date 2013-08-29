@@ -46,3 +46,4 @@ A path refers to an object, that is, it ends with an identifier.
     [error]                             ^
     [error] one error found
 
+- Need to make it more convenient to create a nullary spore
