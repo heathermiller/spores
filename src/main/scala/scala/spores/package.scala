@@ -10,6 +10,7 @@ package scala
 
 import scala.language.experimental.macros
 import scala.reflect.macros.Context
+import scala.tools.nsc.Global
 
 package object spores {
 
@@ -47,18 +48,24 @@ package object spores {
     }
   }
 
+  private[spores] val isDebugEnabled = true
+  private[spores] def debug(s: => String): Unit =
+    if (isDebugEnabled) println(s)
+
   /**
      spore {
        val x = outer
        (y: T) => { ... }
      }
    */
-  private def check[C <: Context with Singleton](c: Context)(funTree: c.Tree): Unit = {
-    import c.universe._
+  private def check[C <: Context with Singleton](c: Context)(funTree1: c.Tree): Unit = {
+    val powerContext = c.asInstanceOf[c.type { val universe: Global; val callsiteTyper: universe.analyzer.Typer }]
+    val global: powerContext.universe.type = powerContext.universe
+    val callSiteTyper: global.analyzer.Typer = powerContext.callsiteTyper
 
-    val isDebugEnabled = false
-    def debug(s: => String): Unit =
-      if (isDebugEnabled) println(s)
+    import global._
+
+    val funTree = funTree1.asInstanceOf[global.Tree]
 
     // traverse body of `fun` and check that the free vars access only allowed things
     val (validEnv, funLiteral) = funTree match {
@@ -67,7 +74,7 @@ package object spores {
           stmt match {
             case vd @ ValDef(mods, name, tpt, rhs) => List(vd.symbol)
             case _ =>
-              c.error(stmt.pos, "Only val defs allowed at this position")
+              powerContext.error(stmt.pos, "Only val defs allowed at this position")
               List()
           }
         }
@@ -90,26 +97,17 @@ package object spores {
           capturedSyms.contains(s) ||
           s.owner == fun.symbol ||
           s.isStatic || {
-            c.error(s.pos, "invalid reference to " + s)
+            powerContext.error(s.pos, "invalid reference to " + s)
             false
           }
-
-        def isStablePath(t: Tree): Boolean = t match {
-          case sel @ Select(s, _) =>
-            isStablePath(s) && sel.symbol.asTerm.isStable
-          case id: Ident =>
-            id.symbol.asTerm.isStable
-          case _ =>
-            false
-        }
 
         // traverse and collect captured symbols
         val collectCapturedTraverser = new Traverser {
           override def traverse(tree: Tree): Unit = tree match {
             case app @ Apply(fun, List(captured)) if (fun.symbol == captureDef) =>
               debug("found capture: " + app)
-              if (!isStablePath(captured))
-                c.error(captured.pos, "Only stable paths can be captured")
+              if (!global.treeInfo.isExprSafeToInline(captured))
+                powerContext.error(captured.pos, "Only stable paths can be captured")
               else
                 capturedSyms ::= captured.symbol
             case _ =>
@@ -132,7 +130,7 @@ package object spores {
                 debug("checking select (app)" + sel)
                 if (app.symbol.isStatic) {
                   debug("OK, fun static")
-                } else c.error(sel.pos, "the fun is not static")
+                } else powerContext.error(sel.pos, "the fun is not static")
 
               case sel @ Select(pre, _) =>
                 debug("checking select " + sel)
@@ -146,7 +144,7 @@ package object spores {
 
         traverser.traverse(body)
       case _ =>
-        c.error(funLiteral.pos, "Incorrect usage of `spore`: function literal expected")
+        powerContext.error(funLiteral.pos, "Incorrect usage of `spore`: function literal expected")
     }
   }
 
@@ -184,13 +182,9 @@ package object spores {
     }
   }
 
-
+  // what does this do?
   private def checkTc[C <: Context with Singleton](c: Context)(funTree: c.Tree): List[c.Type] = {
     import c.universe._
-
-    val isDebugEnabled = true
-    def debug(s: => String): Unit =
-      if (isDebugEnabled) println(s)
 
     // traverse body of `fun` and check that the free vars access only allowed things
     val (validEnv, funLiteral) = funTree match {
