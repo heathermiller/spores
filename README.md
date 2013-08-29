@@ -47,3 +47,4 @@ A path refers to an object, that is, it ends with an identifier.
     [error] one error found
 
 - Need to make it more convenient to create a nullary spore
+- Need to analyze and reject lazy vals in captures

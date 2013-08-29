@@ -38,7 +38,6 @@ class StablePathSpec extends SuperTest {
 
   @Test
   def `can capture this in a stable path`() {
-    import Spore.capture
     val s: Spore[Int, String] = spore {
       (x: Int) => s"${capture(this.v0)}"
     }
@@ -50,7 +49,6 @@ class StablePathSpec extends SuperTest {
   // https://issues.scala-lang.org/browse/SI-1938
   // @Test
   // def `can capture super in a stable path`() {
-  //   import Spore.capture
   //   val s: Spore[Int, String] = spore {
   //     (x: Int) => s"arg: $x, c1: ${capture(super.name)}"
   //   }
@@ -60,7 +58,6 @@ class StablePathSpec extends SuperTest {
 
   @Test
   def `can capture an innocuous simple stable path`() {
-    import Spore.capture
     object Innocuous {
       val cute = "fluffy"
     }
@@ -73,7 +70,6 @@ class StablePathSpec extends SuperTest {
 
   @Test
   def `can capture an innocuous stable path in a package`() {
-    import Spore.capture
     val s: Spore[Int, String] = spore {
       (x: Int) => s"${capture(stablePathPkg.StablePathObj.kitteh)}"
     }

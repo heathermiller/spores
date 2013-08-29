@@ -26,6 +26,21 @@ class NegSpec {
   }
 }
 
+//   @Test
+//   def `no lazy vals allowed`() {
+//     expectError("Only stable paths can be captured") {
+//       """
+//         import scala.spores._
+//         import Spore.capture
+//         lazy val v1 = 10
+//         val s: Spore[Int, Unit] = spore {
+//           (x: Int) => println(s"arg: $x, c1: ${capture(v1)}")
+//         }
+//       """
+//     }
+//   }
+// }
+
 @RunWith(classOf[JUnit4])
 class StablePathNegSpec {
   @Test
@@ -33,7 +48,6 @@ class StablePathNegSpec {
     expectError("Only stable paths can be captured") {
       """
         import scala.spores._
-        import Spore.capture
         val a = 12
         val s: Spore[Int, Unit] = spore {
           (x: Int) => capture({def x = ??? ; a })
@@ -47,7 +61,6 @@ class StablePathNegSpec {
     expectError("Only stable paths can be captured") {
       """
         import scala.spores._
-        import Spore.capture
         def compute(x: Int): Int = x * 5
         val s: Spore[Int, String] = spore { (x: Int) =>
           val cc1 = capture(compute(2))
@@ -62,7 +75,6 @@ class StablePathNegSpec {
     expectError("Only stable paths can be captured") {
       """
         import scala.spores._
-        import Spore.capture
         // this is a var:
         var v1: Int = 10
         val s: Spore[Int, String] = spore { (x: Int) =>
@@ -78,7 +90,6 @@ class StablePathNegSpec {
     expectError("Only stable paths can be captured") {
       """
         import scala.spores._
-        import Spore.capture
         val s: Spore[Int, String] = spore { (x: Int) =>
           val capt = capture(1)
           s"$capt"
@@ -92,7 +103,6 @@ class StablePathNegSpec {
     expectError("Only stable paths can be captured") {
       """
         import scala.spores._
-        import Spore.capture
         val v = 10
         val s: Spore[Int, String] = spore { (x: Int) =>
           val capt = capture(v: Any)

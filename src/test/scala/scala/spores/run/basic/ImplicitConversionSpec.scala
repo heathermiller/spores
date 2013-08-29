@@ -6,8 +6,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
 
-import Spore.capture
-
 @RunWith(classOf[JUnit4])
 class ImplicitConversionSpec {
   @Test
@@ -21,15 +19,15 @@ class ImplicitConversionSpec {
 
     assert(s(20) == "arg: 20, cc1: 10")
   }
-/*
-  @Test
-  def illegalCapture() {
-    // this is a var:
-    var v1: Int = 10
-    val s: Spore[Int, String] = spore { (x: Int) =>
-      val cc1 = capture(v1)
-      s"arg: $x, cc1: $cc1"
-    }
-  }
-*/
+
+  // this should be rejected
+  // @Test
+  // def illegalCapture() {
+  //   // this is a var:
+  //   var v1: Int = 10
+  //   val s: Spore[Int, String] = { (x: Int) =>
+  //     val cc1 = capture(v1)
+  //     s"arg: $x, cc1: $cc1"
+  //   }
+  // }
 }

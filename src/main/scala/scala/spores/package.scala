@@ -13,6 +13,8 @@ import scala.reflect.macros.Context
 
 package object spores {
 
+  def capture[T](x: T): T = x
+
   /**
    *  Usage:
    *
@@ -76,7 +78,7 @@ package object spores {
         (List(), expr)
     }
 
-    val captureSym = typeOf[Spore.type].member(newTermName("capture"))
+    val captureSym = typeOf[spores.`package`.type].member(newTermName("capture"))
 
     funLiteral match {
       case fun @ Function(vparams, body) =>
