@@ -95,12 +95,17 @@ package object spores {
           }
 
         // is tree t a path with only stable components?
-        // TODO, also valid is usage of `this` and `super` according to SLS 3.6
         def isStablePath(t: Tree): Boolean = t match {
           case sel @ Select(s, _) =>
             isStablePath(s) && sel.symbol.asTerm.isStable
           case id: Ident =>
             id.symbol.asTerm.isStable
+          case th: This =>
+            true
+          // we can't seem to have a super in paths because of S-1938, pity
+          // https://issues.scala-lang.org/browse/SI-1938
+          // case supr: Super =>
+          //   true
           case _ =>
             false
         }

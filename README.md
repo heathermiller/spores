@@ -31,3 +31,18 @@ defined to be one of the following:
 - `C.super.x` or `C.super[M].x` where `C` references a class and `x` references a stable member of the super class or designated parent class `M` of `C`. The prefix `super` is taken as a shorthand for `C.super` where `C` is the name of the class directly enclosing the reference.
 
 A path refers to an object, that is, it ends with an identifier.
+
+### Uglies
+
+- Right now, `capture` method has to be imported. This is less than desirable, but it's this way because we couldn't figure out how to obtain the symbol of the capture method if capture is defined inside the `spores` package object. Error:
+
+    [error] /Users/hmiller/Dropbox/git-shared/spores/src/main/scala/scala/spores/package.scala:81: type mismatch;
+    [error]  found   : spores.type
+    [error]  required: AnyRef
+    [error] Note that spores extends Any, not AnyRef.
+    [error] Such types can participate in value classes, but instances
+    [error] cannot appear in singleton types or in reference comparisons.
+    [error]     val captureSym = typeOf[spores.type].member(newTermName("capture"))
+    [error]                             ^
+    [error] one error found
+

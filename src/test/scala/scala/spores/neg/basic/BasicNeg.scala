@@ -24,6 +24,23 @@ class NegSpec {
       """
     }
   }
+}
+
+@RunWith(classOf[JUnit4])
+class StablePathNegSpec {
+  @Test
+  def `blocks aren't stable`() {
+    expectError("Only stable paths can be captured") {
+      """
+        import scala.spores._
+        import Spore.capture
+        val a = 12
+        val s: Spore[Int, Unit] = spore {
+          (x: Int) => capture({def x = ??? ; a })
+        }
+      """
+    }
+  }
 
   @Test
   def `only allowed to capture paths 1`() {
@@ -55,5 +72,4 @@ class NegSpec {
       """
     }
   }
-
 }
