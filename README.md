@@ -34,17 +34,5 @@ A path refers to an object, that is, it ends with an identifier.
 
 ### Uglies
 
-- Right now, `capture` method has to be imported. This is less than desirable, but it's this way because we couldn't figure out how to obtain the symbol of the capture method if capture is defined inside the `spores` package object. Error:
-
-    [error] /Users/hmiller/Dropbox/git-shared/spores/src/main/scala/scala/spores/package.scala:81: type mismatch;
-    [error]  found   : spores.type
-    [error]  required: AnyRef
-    [error] Note that spores extends Any, not AnyRef.
-    [error] Such types can participate in value classes, but instances
-    [error] cannot appear in singleton types or in reference comparisons.
-    [error]     val captureSym = typeOf[spores.type].member(newTermName("capture"))
-    [error]                             ^
-    [error] one error found
-
 - Need to make it more convenient to create a nullary spore
-- Need to analyze and reject lazy vals in captures
+- Should objects be allowed in paths? The reason is that they are initialized lazily, so if we don't allow lazy vals, then allowing objects (which could end up being initialized only when the spore is applied) doesn't make a lot of sense.
