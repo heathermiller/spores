@@ -24,22 +24,35 @@ class NegSpec {
       """
     }
   }
-}
 
-//   @Test
-//   def `no lazy vals allowed`() {
-//     expectError("Only stable paths can be captured") {
-//       """
-//         import scala.spores._
-//         import Spore.capture
-//         lazy val v1 = 10
-//         val s: Spore[Int, Unit] = spore {
-//           (x: Int) => println(s"arg: $x, c1: ${capture(v1)}")
-//         }
-//       """
-//     }
-//   }
-// }
+  @Test
+  def `no lazy vals allowed`() {
+    expectError("A captured path cannot contain lazy members") {
+      """
+        import scala.spores._
+        lazy val v1 = 10
+        val s: Spore[Int, Unit] = spore {
+          (x: Int) => println(s"arg: $x, c1: ${capture(v1)}")
+        }
+      """
+    }
+  }
+
+  @Test
+  def `no lazy vals allowed in any path`() {
+    expectError("A captured path cannot contain lazy members") {
+      """
+        object NoLazyValsObj {
+          lazy val v1 = 10
+        }
+        import scala.spores._
+        val s: Spore[Int, Unit] = spore {
+          (x: Int) => println(s"arg: $x, c1: ${capture(NoLazyValsObj.v1)}")
+        }
+      """
+    }
+  }
+}
 
 @RunWith(classOf[JUnit4])
 class StablePathNegSpec {

@@ -96,12 +96,12 @@ package object spores {
             false
           }
 
-        // is tree t a path with only stable components?
-        def isStablePath(t: Tree): Boolean = t match {
+        // is tree t a path with only components that satisfy pred? (eg stable or lazy)
+        def isPathWith(t: Tree)(pred: TermSymbol => Boolean): Boolean = t match {
           case sel @ Select(s, _) =>
-            isStablePath(s) && sel.symbol.asTerm.isStable
+            isPathWith(s)(pred) && pred(sel.symbol.asTerm)
           case id: Ident =>
-            id.symbol.asTerm.isStable
+            pred(id.symbol.asTerm)
           case th: This =>
             true
           // we can't seem to have a super in paths because of S-1938, pity
@@ -117,8 +117,10 @@ package object spores {
           override def traverse(tree: Tree): Unit = tree match {
             case app @ Apply(fun, List(captured)) if (fun.symbol == captureSym) =>
               debug("found capture: " + app)
-              if (!isStablePath(captured))
+              if (!isPathWith(captured)(_.isStable))
                 c.error(captured.pos, "Only stable paths can be captured")
+              else if (!isPathWith(captured)(!_.isLazy))
+                c.error(captured.pos, "A captured path cannot contain lazy members")
               else
                 capturedSyms ::= captured.symbol
             case _ =>
