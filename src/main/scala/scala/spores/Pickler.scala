@@ -33,7 +33,8 @@ object SporePickler {
     val picklerUnpicklerName = c.fresh(newTermName("SporePicklerUnpickler"))
 
     q"""
-      object $picklerUnpicklerName extends scala.pickling.SPickler[Spore[$ttpe, $rtpe] { type Captured = $utpe }] {
+      object $picklerUnpicklerName extends scala.pickling.SPickler[Spore[$ttpe, $rtpe] { type Captured = $utpe }]
+          with scala.pickling.Unpickler[Spore[$ttpe, $rtpe] { type Captured = $utpe }] {
         val format = implicitly[${format.tpe}]
 
         def pickle(picklee: Spore[$ttpe, $rtpe] { type Captured = $utpe }, builder: PBuilder): Unit = {
@@ -53,6 +54,29 @@ object SporePickler {
           })
 
           builder.endEntry()
+        }
+
+        def unpickle(tag: => scala.pickling.FastTypeTag[_], reader: PReader): Any = {
+          val reader1 = reader.readField("className")
+          reader1.hintTag(implicitly[FastTypeTag[String]])
+          reader1.hintStaticallyElidedType()
+
+          val tag = reader1.beginEntry()
+          val result = scala.pickling.SPickler.stringPicklerUnpickler.unpickle(tag, reader1)
+          reader1.endEntry()
+
+          val clazz = java.lang.Class.forName(result.asInstanceOf[String])
+          val sporeInst = scala.concurrent.util.Unsafe.instance.allocateInstance(clazz).asInstanceOf[SporeC1[$ttpe, $rtpe] { type Captured = $utpe }]
+
+          val reader2 = reader.readField("c1")
+          reader2.hintTag($cTag)
+          ${if (isEffectivelyPrimitive(utpe)) q"reader2.hintStaticallyElidedType()" else q""}
+          val tag2 = reader2.beginEntry()
+          val result2 = $cPickler.unpickle(tag2, reader2)
+          reader2.endEntry()
+          sporeInst.c1 = result2.asInstanceOf[$utpe]
+
+          sporeInst
         }
       }
       $picklerUnpicklerName

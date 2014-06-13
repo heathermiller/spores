@@ -19,7 +19,7 @@ class PicklingSpec {
       (x: Int) => s"arg: $x, c1: $c1"
     }
 
-    /*implicit*/ val pickler: SPickler[Spore[Int, String] { type Captured = Int }] =
+    /*implicit*/ val pickler: SPickler[Spore[Int, String] { type Captured = Int }] with Unpickler[Spore[Int, String] { type Captured = Int }] =
     SporePickler.genSporePickler[Int, String, Int]
 
     val format = implicitly[PickleFormat]
@@ -30,9 +30,15 @@ class PicklingSpec {
 
     assert(res.value == """{
   "tpe": "scala.spores.Spore[scala.Int,java.lang.String]",
-  "className": "anonspore$macro$2",
+  "className": "scala.spores.run.pickling.PicklingSpec$anonspore$macro$2$1",
   "c1": 10
 }""")
+
+    val reader = format.createReader(res.asInstanceOf[format.PickleType], scala.pickling.internal.currentMirror)
+    val up = pickler.unpickle(???, reader)
+    val us = up.asInstanceOf[Spore[Int, String]]
+    val res2 = us(5)
+    assert(res2 == "arg: 5, c1: 10")
   }
 
 }

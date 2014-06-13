@@ -16,7 +16,7 @@ trait Spore[-T, +R] extends Function1[T, R] {
 
 trait SporeC1[-T, +R] extends Spore[T, R] {
   type Captured
-  def c1: Captured
+  var c1: Captured
 }
 
 trait Spore2[-T1, -T2, +R] extends Function2[T1, T2, R]

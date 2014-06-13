@@ -254,9 +254,9 @@ package object spores {
           val capturedTpe = capturedTypes.head
 
           q"""
-            class $sporeClassName(val $fieldName: ${capturedTypes.head}) extends SporeC1[$ttpe, $rtpe] {
+            class $sporeClassName(var $fieldName: ${capturedTypes.head}) extends SporeC1[$ttpe, $rtpe] {
               type Captured = $capturedTpe
-              val className: String = ${sporeClassName.toString}
+              val className: String = this.getClass.getName
               $applyDefDef
             }
             val $initializerName = $rhs
