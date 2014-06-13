@@ -58,8 +58,7 @@ package object spores {
        (y: T) => { ... }
      }
    */
-  // new: return optional type constructor of property that's found
-  private def check(c: Context)(funTree: c.Tree): Option[c.Type] = {
+  private def check(c: Context)(funTree: c.Tree, ttpe: c.Type, rtpe: c.Type): c.Tree = {
     import c.universe._
 
     // traverse body of `fun` and check that the free vars access only allowed things
@@ -82,7 +81,7 @@ package object spores {
 
     val captureSym = typeOf[spores.`package`.type].member(newTermName("capture"))
 
-    funLiteral match {
+    val (paramSym, retTpe, funBody) = funLiteral match {
       case fun @ Function(vparams, body) =>
 
         // contains all symbols found in `capture` syntax
@@ -160,14 +159,17 @@ package object spores {
         }
 
         traverser.traverse(body)
+        (vparams.head.symbol, body.tpe, body)
+
       case _ =>
         c.error(funLiteral.pos, "Incorrect usage of `spore`: function literal expected")
+        (null, null, null)
     }
 
     val res = c.inferImplicitValue(typeOf[Property[_]], silent = true)
     debug(s"result of inferring property: $res")
     // type of inferred implicit value
-    if (res != EmptyTree) {
+    val optPropTpe = if (res != EmptyTree) {
       val propTpe = res.tpe
       debug(s"type of property: $propTpe, type args: ${propTpe.typeArgs}")
 
@@ -182,6 +184,82 @@ package object spores {
       Some(instTpe.typeConstructor)
     } else
       None
+
+    if (paramSym != null) {
+      val applyParamName = c.fresh(newTermName("x"))
+      val id = Ident(applyParamName)
+      val applyName = newTermName("apply")
+
+      val applyParamValDef = ValDef(Modifiers(Flag.PARAM), applyParamName, TypeTree(paramSym.typeSignature), EmptyTree)
+      val applyParamSymbol = applyParamValDef.symbol
+
+      val symtable = c.universe.asInstanceOf[scala.reflect.internal.SymbolTable]
+
+      if (validEnv.isEmpty) {
+        // replace reference to paramSym with reference to applyParamSymbol
+        val substituter = new symtable.TreeSubstituter(List(paramSym.asInstanceOf[symtable.Symbol]), List(id.asInstanceOf[symtable.Tree]))
+        val newFunBody = substituter.transform(funBody.asInstanceOf[symtable.Tree])
+
+        val nfBody = c.resetLocalAttrs(newFunBody.asInstanceOf[c.universe.Tree])
+
+        val applyDefDef: DefDef = {
+          val applyVParamss = List(List(applyParamValDef))
+          DefDef(NoMods, applyName, Nil, applyVParamss, TypeTree(retTpe), nfBody)
+        }
+
+        q"""
+          new Spore[$ttpe, $rtpe] {
+            $applyDefDef
+          }
+        """
+      } else {
+        // replace reference to paramSym with reference to applyParamSymbol
+        // and reference to captured variable to new field
+        val capturedTypes = validEnv.map(sym => sym.typeSignature)
+        if (capturedTypes.size > 1) ???
+        else {
+          val fieldName = c.fresh(newTermName("c")) //TODO: improve name
+          val fieldId = Ident(fieldName)
+
+          val symsToReplace = List(paramSym, validEnv.head).map(_.asInstanceOf[symtable.Symbol])
+          val idsToSubstitute = List(id, fieldId).map(_.asInstanceOf[symtable.Tree])
+
+          val substituter = new symtable.TreeSubstituter(symsToReplace, idsToSubstitute)
+          val newFunBody = substituter.transform(funBody.asInstanceOf[symtable.Tree])
+
+          val nfBody = c.resetLocalAttrs(newFunBody.asInstanceOf[c.universe.Tree])
+          val applyDefDef: DefDef = {
+            val applyVParamss = List(List(applyParamValDef))
+            DefDef(NoMods, applyName, Nil, applyVParamss, TypeTree(retTpe), nfBody)
+          }
+
+          val rhs = (funTree match {
+            case Block(stmts, expr) =>
+              stmts.toList flatMap { stmt =>
+                stmt match {
+                  case vd @ ValDef(mods, name, tpt, rhs) => List(rhs)
+                  case _ =>
+                    c.error(stmt.pos, "Only val defs allowed at this position")
+                    List()
+                }
+              }
+          }).head
+
+          val sporeClassName = c.fresh(newTypeName("anonspore"))
+          val initializerName = c.fresh(newTermName("initialize"))
+
+          q"""
+            class $sporeClassName(val $fieldName: ${capturedTypes.head}) extends Spore[$ttpe, $rtpe] {
+              $applyDefDef
+            }
+            val $initializerName = $rhs
+            new $sporeClassName($initializerName)
+          """
+        }
+      }
+    } else {
+      ???
+    }
   }
 
 
@@ -189,23 +267,16 @@ package object spores {
     import c.universe._
 
     // check Spore constraints
-    val optPropType = check(c)(fun.tree)
+    val tree = check(c)(fun.tree, weakTypeOf[T], weakTypeOf[R])
 
-    optPropType match {
-      case Some(propTpe) =>
-        debug(s"need to generate implicit val for property of type: $propTpe")
-      case None => /* do nothing */
-    }
-    reify {
-      new SporeImpl(fun.splice)
-    }
+    c.Expr[Spore[T, R]](tree)
   }
 
   def spore2Impl[T1: c.WeakTypeTag, T2: c.WeakTypeTag, R: c.WeakTypeTag](c: Context)(fun: c.Expr[(T1, T2) => R]): c.Expr[Spore2[T1, T2, R]] = {
     import c.universe._
 
     // check Spore constraints
-    check(c)(fun.tree)
+    check(c)(fun.tree, null, null)
 
     reify {
       new Spore2Impl(fun.splice)
@@ -216,7 +287,7 @@ package object spores {
     import c.universe._
 
     // check Spore constraints
-    check(c)(fun.tree)
+    check(c)(fun.tree, null, null)
 
     reify {
       new Spore3Impl(fun.splice)
