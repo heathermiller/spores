@@ -218,7 +218,7 @@ package object spores {
         val capturedTypes = validEnv.map(sym => sym.typeSignature)
         if (capturedTypes.size > 1) ???
         else {
-          val fieldName = c.fresh(newTermName("c")) //TODO: improve name
+          val fieldName = newTermName("c1")
           val fieldId = Ident(fieldName)
 
           val symsToReplace = List(paramSym, validEnv.head).map(_.asInstanceOf[symtable.Symbol])
@@ -247,9 +247,11 @@ package object spores {
 
           val sporeClassName = c.fresh(newTypeName("anonspore"))
           val initializerName = c.fresh(newTermName("initialize"))
+          val capturedTpe = capturedTypes.head
 
           q"""
             class $sporeClassName(val $fieldName: ${capturedTypes.head}) extends Spore[$ttpe, $rtpe] {
+              type Captured = $capturedTpe
               $applyDefDef
             }
             val $initializerName = $rhs
