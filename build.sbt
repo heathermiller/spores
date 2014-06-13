@@ -1,4 +1,4 @@
-scalaVersion := "2.11.0-M7"
+scalaVersion := "2.11.1"
 
 organization := "org.scala-lang"
 
@@ -20,5 +20,7 @@ libraryDependencies += "com.novocode" % "junit-interface" % "0.10-M2" % "test"
 testOptions += Tests.Argument(TestFrameworks.JUnit, "-q", "-v", "-s")
 
 parallelExecution in Test := false
+
+scalacOptions in Compile ++= Seq("-Xexperimental")
 
 scalacOptions in Test ++= Seq("-Xlog-implicits"/*, "-Ybrowse:typer"*/)

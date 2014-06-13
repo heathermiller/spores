@@ -20,6 +20,7 @@ class ImplicitConversionSpec {
     assert(s(20) == "arg: 20, cc1: 10")
   }
 
+  /* needs to be compiled using -Xexperimental */
   @Test
   def `fails without SAM type inference`() {
     import scala.spores._
