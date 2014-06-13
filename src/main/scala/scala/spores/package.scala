@@ -57,7 +57,8 @@ package object spores {
        (y: T) => { ... }
      }
    */
-  private def check(c: Context)(funTree: c.Tree): Unit = {
+  // new: return optional type constructor of property that's found
+  private def check(c: Context)(funTree: c.Tree): Option[c.Type] = {
     import c.universe._
 
     // traverse body of `fun` and check that the free vars access only allowed things
@@ -161,6 +162,25 @@ package object spores {
       case _ =>
         c.error(funLiteral.pos, "Incorrect usage of `spore`: function literal expected")
     }
+
+    val res = c.inferImplicitValue(typeOf[Property[_]], silent = true)
+    debug(s"result of inferring property: $res")
+    // type of inferred implicit value
+    if (res != EmptyTree) {
+      val propTpe = res.tpe
+      debug(s"type of property: $propTpe, type args: ${propTpe.typeArgs}")
+
+      // type of implicit val to be added to spore
+      val instTpe = propTpe.typeArgs.head
+      debug(s"adding instances of base type: $instTpe")
+
+      // example:
+      val intInstTpe = appliedType(instTpe.typeConstructor, typeOf[Int])
+      debug(s"example Int instance: $intInstTpe")
+
+      Some(instTpe.typeConstructor)
+    } else
+      None
   }
 
 
@@ -168,8 +188,13 @@ package object spores {
     import c.universe._
 
     // check Spore constraints
-    check(c)(fun.tree)
+    val optPropType = check(c)(fun.tree)
 
+    optPropType match {
+      case Some(propTpe) =>
+        debug(s"need to generate implicit val for property of type: $propTpe")
+      case None => /* do nothing */
+    }
     reify {
       new SporeImpl(fun.splice)
     }
