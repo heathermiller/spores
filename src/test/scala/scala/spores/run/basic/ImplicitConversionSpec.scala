@@ -19,7 +19,7 @@ class ImplicitConversionSpec {
 
     assert(s(20) == "arg: 20, cc1: 10")
   }
-
+/*
   /* needs to be compiled using -Xexperimental */
   @Test
   def `fails without SAM type inference`() {
@@ -33,7 +33,7 @@ class ImplicitConversionSpec {
     val m = new Mappable("hello")
     val m2: Mappable[Int] = m.map(s => s.length)
   }
-
+*/
   // this should be rejected
   // @Test
   // def illegalCapture() {

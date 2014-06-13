@@ -17,6 +17,8 @@ libraryDependencies += "junit" % "junit-dep" % "4.10" % "test"
 
 libraryDependencies += "com.novocode" % "junit-interface" % "0.10-M2" % "test"
 
+libraryDependencies += "org.scala-lang" %% "scala-pickling" % "0.8.0"
+
 testOptions += Tests.Argument(TestFrameworks.JUnit, "-q", "-v", "-s")
 
 parallelExecution in Test := false

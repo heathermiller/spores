@@ -10,7 +10,14 @@ package scala.spores
 
 trait NullarySpore[+R] extends Function0[R]
 
-trait Spore[-T, +R] extends Function1[T, R]
+trait Spore[-T, +R] extends Function1[T, R] {
+  def className: String
+}
+
+trait SporeC1[-T, +R] extends Spore[T, R] {
+  type Captured
+  def c1: Captured
+}
 
 trait Spore2[-T1, -T2, +R] extends Function2[T1, T2, R]
 
@@ -22,6 +29,7 @@ class NullarySporeImpl[+R](f: () => R) extends NullarySpore[R] {
 
 class SporeImpl[-T, +R](f: T => R) extends Spore[T, R] {
   def apply(x: T): R = f(x)
+  def className = "SporeImpl"
 }
 
 class Spore2Impl[-T1, -T2, +R](f: (T1, T2) => R) extends Spore2[T1, T2, R] {

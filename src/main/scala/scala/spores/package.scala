@@ -49,7 +49,7 @@ package object spores {
 
   // TOGGLE DEBUGGING
   private val isDebugEnabled = System.getProperty("spores.debug", "false").toBoolean
-  private def debug(s: => String): Unit =
+  private[spores] def debug(s: => String): Unit =
     if (isDebugEnabled) println(s)
 
   /**
@@ -207,10 +207,14 @@ package object spores {
           DefDef(NoMods, applyName, Nil, applyVParamss, TypeTree(retTpe), nfBody)
         }
 
+        val sporeClassName = c.fresh(newTypeName("anonspore"))
+
         q"""
-          new Spore[$ttpe, $rtpe] {
+          class $sporeClassName extends Spore[$ttpe, $rtpe] {
+            val className: String = ${sporeClassName.toString}
             $applyDefDef
           }
+          new $sporeClassName
         """
       } else {
         // replace reference to paramSym with reference to applyParamSymbol
@@ -250,8 +254,9 @@ package object spores {
           val capturedTpe = capturedTypes.head
 
           q"""
-            class $sporeClassName(val $fieldName: ${capturedTypes.head}) extends Spore[$ttpe, $rtpe] {
+            class $sporeClassName(val $fieldName: ${capturedTypes.head}) extends SporeC1[$ttpe, $rtpe] {
               type Captured = $capturedTpe
+              val className: String = ${sporeClassName.toString}
               $applyDefDef
             }
             val $initializerName = $rhs
