@@ -13,9 +13,9 @@ libraryDependencies <++= (scalaVersion) {
   )
 }
 
-libraryDependencies += "junit" % "junit-dep" % "4.10" % "test"
+libraryDependencies += "junit" % "junit-dep" % "4.11" % "test"
 
-libraryDependencies += "com.novocode" % "junit-interface" % "0.10-M2" % "test"
+libraryDependencies += "com.novocode" % "junit-interface" % "0.11-RC1" % "test"
 
 libraryDependencies += "org.scala-lang" %% "scala-pickling" % "0.8.0"
 
