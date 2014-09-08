@@ -47,7 +47,7 @@ object util {
   }
 
   def toolboxClasspath = {
-    val f = new java.io.File(s"target/scala-${scalaBinaryVersion}/classes")
+    val f = new java.io.File(s"core/target/scala-${scalaBinaryVersion}/classes")
     if (!f.exists) sys.error(s"output directory ${f.getAbsolutePath} does not exist.")
     f.getAbsolutePath
   }
