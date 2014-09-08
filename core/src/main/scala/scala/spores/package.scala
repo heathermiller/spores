@@ -149,7 +149,8 @@ package object spores {
 
               case sel @ Select(pre, _) =>
                 debug("checking select " + sel)
-                isSymbolValid(sel.symbol)
+                if (!sel.symbol.isMethod)
+                  isSymbolValid(sel.symbol)
 
               case _ =>
                 super.traverse(tree)
