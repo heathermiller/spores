@@ -7,7 +7,7 @@ object SporesBuild extends Build {
 
   lazy val buildSettings = Seq(
     organization := "org.scala-lang.modules",
-    version      := "0.1-SNAPSHOT",
+    version      := "0.1.0-SNAPSHOT",
     scalaVersion := "2.11.2"
   )
 
@@ -20,6 +20,11 @@ object SporesBuild extends Build {
     id = "spores-core",
     base = file("core")
   )
+
+  lazy val pickling = Project(
+    id = "spores-pickling",
+    base = file("spores-pickling")
+  ) dependsOn(core)
 
   override lazy val settings =
     super.settings ++
