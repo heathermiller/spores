@@ -1,6 +1,32 @@
 # Spores
 
-Scala Spores, safe mobile closures
+Scala Spores, safe mobile closures: [SIP-21](http://docs.scala-lang.org/sips/pending/spores.html)
+
+## Building Spores
+
+The Spores project is built and tested using sbt. It has two modules:
+`spores-core` and `spores-pickling`. The `spores-core` module contains the
+core type definitions and the `spore` macro. The `spores-pickling` module
+integrates Spores with [scala/pickling](https://github.com/scala/pickling)
+by providing picklers for Spores.
+
+To build the core Spores module:
+```
+> project spores-core
+> compile
+```
+
+To run the test suite:
+```
+> test
+```
+
+The `spores-pickling` module currently depends on the following snapshot
+version of pickling:
+```
+"org.scala-lang" %% "scala-pickling" % "0.9.1-SNAPSHOT"
+```
+
 
 ## Updates since the first draft (June 16th, 2013) of SIP-21
 
@@ -12,7 +38,23 @@ arguments.
 ### Capture Syntax
 
 To remedy the incompatibility with for-expressions, we propose a new `capture`
-syntax.
+syntax. Here is an exemplary use in the context of a hypothetical
+`DCollection` type:
+
+```scala
+def lookup(i: Int): DCollection[Int] = ...
+val indices: DCollection[Int] = ...
+
+for { i <- indices
+      j <- lookup(i)
+} yield j + capture(i)
+
+trait DCollection[A] {
+  def map[B](sp: Spore[A, B]): DCollection[B]
+  def flatMap[B](sp: Spore[A, DCollection[B]): DCollection[B]
+}
+```
+
 
 ### Stable Paths
 
@@ -36,3 +78,4 @@ A path refers to an object, that is, it ends with an identifier.
 
 - Need to make it more convenient to create a nullary spore
 - Should objects be allowed in paths? The reason is that they are initialized lazily, so if we don't allow lazy vals, then allowing objects (which could end up being initialized only when the spore is applied) doesn't make a lot of sense.
+
