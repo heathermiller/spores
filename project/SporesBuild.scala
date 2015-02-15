@@ -7,7 +7,7 @@ object SporesBuild extends Build {
 
   lazy val buildSettings = Seq(
     organization := "org.scala-lang.modules",
-    version      := "0.1.0-SNAPSHOT",
+    version      := "0.1.0",
     scalaVersion := "2.11.4"
   )
 
