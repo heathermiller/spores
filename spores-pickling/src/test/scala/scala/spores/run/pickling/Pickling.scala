@@ -7,6 +7,7 @@ import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
 
 import scala.pickling._
+import Defaults._
 import json._
 
 import SporePickler._
@@ -21,7 +22,7 @@ class PicklingSpec {
       (x: Int) => s"arg: $x, c1: $c1"
     }
 
-    val pickler: SPickler[Spore[Int, String] { type Captured = Int }] with Unpickler[Spore[Int, String] { type Captured = Int }] =
+    val pickler: Pickler[Spore[Int, String] { type Captured = Int }] with Unpickler[Spore[Int, String] { type Captured = Int }] =
       SporePickler.genSporePickler[Int, String, Int]
 
     val format = implicitly[PickleFormat]
@@ -35,8 +36,8 @@ class PicklingSpec {
   "c1": 10
 }"""))
 
-    val reader = format.createReader(res.asInstanceOf[format.PickleType], scala.reflect.runtime.currentMirror)
-    val up = pickler.unpickle(???, reader)
+    val reader = format.createReader(res.asInstanceOf[format.PickleType])
+    val up = pickler.unpickle("scala.spores.Spore[Int, String]", reader)
     val us = up.asInstanceOf[Spore[Int, String]]
     val res2 = us(5)
     assert(res2 == "arg: 5, c1: 10")
@@ -83,14 +84,14 @@ class PicklingSpec {
     }
 
     assert(res.value.toString.endsWith(""""captured": {
-      |    "tpe": "scala.Tuple2[scala.Int,java.lang.String]",
+      |    "$type": "scala.Tuple2[scala.Int,java.lang.String]",
       |    "_1": 10,
       |    "_2": "hello"
       |  }
       |}""".stripMargin))
 
-    val reader = format.createReader(res.asInstanceOf[format.PickleType], scala.reflect.runtime.currentMirror)
-    val up = pickler.unpickle(???, reader)
+    val reader = format.createReader(res.asInstanceOf[format.PickleType])
+    val up = pickler.unpickle("scala.spores.Spore[Int, String]", reader)
     val us = up.asInstanceOf[Spore[Int, String]]
     val res2 = us(5)
     assert(res2 == "arg: 5, c1: 10, c2: hello")
