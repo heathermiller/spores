@@ -91,7 +91,7 @@ class PicklingSpec {
       |}""".stripMargin))
 
     val reader = format.createReader(res.asInstanceOf[format.PickleType])
-    val up = pickler.unpickle("Spore[Int, String]", reader)
+    val up = pickler.unpickle("scala.spores.Spore[Int, String]", reader)
     val us = up.asInstanceOf[Spore[Int, String]]
     val res2 = us(5)
     assert(res2 == "arg: 5, c1: 10, c2: hello")
