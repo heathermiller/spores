@@ -209,7 +209,7 @@ package object spores {
 
         q"""
           class $sporeClassName extends Spore[$ttpe, $rtpe] {
-            val className: String = ${sporeClassName.toString}
+            val className: String = this.getClass.getName
             $applyDefDef
           }
           new $sporeClassName
