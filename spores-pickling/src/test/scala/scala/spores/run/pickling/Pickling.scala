@@ -113,6 +113,15 @@ class PicklingSpec {
   }
 
   @Test
+  def `simple pickling of spore with one parameter`() {
+    val s = spore { (l: List[Int]) => l.map(_ + 1) }
+    val res  = s.pickle
+    val up   = res.unpickle[Spore[List[Int], List[Int]]]
+    val res2 = up(List(1, 2, 3))
+    assert(res2.toString == "List(2, 3, 4)")
+  }
+
+  @Test
   def `simple pickling of spore with two parameters`() {
     val s = spore {
       (x: Int, s: String) => s"arg1: $x, arg2: $s"

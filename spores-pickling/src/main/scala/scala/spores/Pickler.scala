@@ -113,7 +113,7 @@ object SporePickler {
     import definitions.ArrayClass
 */
 
-  implicit def genSporeNCPickler[T, R](implicit tag: FastTypeTag[Spore[T, R]]): Pickler[Spore[T, R]] =
+  implicit def genSporeNCPickler[T, R](implicit tag: FastTypeTag[Spore[T, R]]): Pickler[Spore[T, R] { val className: String }] =
     macro genSporeNCPicklerImpl[T, R]
 
   def genSporeNCPicklerImpl[T: c.WeakTypeTag, R: c.WeakTypeTag](c: Context)(tag: c.Tree): c.Tree = {
@@ -126,8 +126,11 @@ object SporePickler {
     val picklerName = c.fresh(newTermName("SporePickler"))
 
     q"""
-      object $picklerName extends scala.pickling.Pickler[Spore[$ttpe, $rtpe]] {
-        def pickle(picklee: Spore[$ttpe, $rtpe], builder: PBuilder): Unit = {
+      object $picklerName extends scala.pickling.Pickler[Spore[$ttpe, $rtpe] { val className: String }] {
+        def tag: scala.pickling.FastTypeTag[Spore[$ttpe, $rtpe] { val className: String }] =
+          implicitly[scala.pickling.FastTypeTag[Spore[$ttpe, $rtpe] { val className: String }]]
+
+        def pickle(picklee: Spore[$ttpe, $rtpe] { val className: String }, builder: PBuilder): Unit = {
           builder.beginEntry(picklee)
 
           builder.putField("className", b => {
