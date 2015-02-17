@@ -10,6 +10,9 @@ import scala.pickling._
 import Defaults._
 import binary._
 
+import SporePickler._
+
+
 trait Emitter[T] {
   def emit(v: T)(implicit pickler: Pickler[T], unpickler: Unpickler[T]): Unit
   def done(): Unit
@@ -18,7 +21,7 @@ trait Emitter[T] {
 @RunWith(classOf[JUnit4])
 class PicklingBinarySpec {
   @Test
-  def `pickle/unpickle to/from binary`() {
+  def `pickle/unpickle to/from binary`(): Unit = {
     val v1 = 10
     val s = spore {
       val c1 = v1
@@ -43,7 +46,7 @@ class PicklingBinarySpec {
   }
 
   @Test
-  def `generated nested classes`() {
+  def `generated nested classes`(): Unit = {
     val s = spore {
       implicit val p = implicitly[Pickler[(Int, List[String])]]
       implicit val u = implicitly[Unpickler[(Int, List[String])]]
@@ -51,5 +54,13 @@ class PicklingBinarySpec {
         if (elem._1 == 0) emit.emit(elem)
     }
     assert(true)
+  }
+
+  @Test
+  def testSimpleSpore(): Unit = {
+    val s: Spore[Int, Int] = spore { (x: Int) => x + 1 }
+    val p = s.pickle
+    val s2 = p.unpickle[Spore[Int, Int]]
+    assert(s2(10) == 11)
   }
 }
