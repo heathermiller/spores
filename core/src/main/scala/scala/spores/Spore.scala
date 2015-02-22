@@ -22,8 +22,11 @@ trait Spore[-T, +R] extends Function1[T, R] {
 
   /** Enables creating an instance of a Spore subclass via reflection.
    */
-  def className: String
+  def className: String =
+    _className
 
+  protected[this] var _className: String =
+    null
 }
 
 trait SporeWithEnv[-T, +R] extends Spore[T, R] {
@@ -42,9 +45,63 @@ trait SporeC1[-T, +R] extends SporeWithEnv[T, R] {
   var c1: C1
 }
 
-trait Spore2[-T1, -T2, +R] extends Function2[T1, T2, R]
+trait Spore2[-T1, -T2, +R] extends Function2[T1, T2, R] {
 
-trait Spore3[-T1, -T2, -T3, +R] extends Function3[T1, T2, T3, R]
+  /** The type of captured variables.
+   *
+   *  If this Spore captures multiple variables, this is
+   *  a tuple type.
+   */
+  type Captured
+
+  /** Enables creating an instance of a Spore subclass via reflection.
+   */
+  def className: String =
+    _className
+
+  protected[this] var _className: String =
+    null
+}
+
+trait Spore2WithEnv[-T1, -T2, +R] extends Spore2[T1, T2, R] {
+
+  /** Stores the environment of the Spore.
+   *
+   *  If the Spore captures multiple variables, this field
+   *  stores a tuple.
+   */
+  var captured: Captured = _
+
+}
+
+trait Spore3[-T1, -T2, -T3, +R] extends Function3[T1, T2, T3, R] {
+
+  /** The type of captured variables.
+   *
+   *  If this Spore captures multiple variables, this is
+   *  a tuple type.
+   */
+  type Captured
+
+  /** Enables creating an instance of a Spore subclass via reflection.
+   */
+  def className: String =
+    _className
+
+  protected[this] var _className: String =
+    null
+}
+
+trait Spore3WithEnv[-T1, -T2, -T3, +R] extends Spore3[T1, T2, T3, R] {
+
+  /** Stores the environment of the Spore.
+   *
+   *  If the Spore captures multiple variables, this field
+   *  stores a tuple.
+   */
+  var captured: Captured = _
+
+}
 
 class NullarySporeImpl[+R](val f: () => R) extends NullarySpore[R] {
   def apply(): R = f()
@@ -52,7 +109,7 @@ class NullarySporeImpl[+R](val f: () => R) extends NullarySpore[R] {
 
 class SporeImpl[-T, +R](val f: T => R) extends Spore[T, R] {
   def apply(x: T): R = f(x)
-  def className = "SporeImpl"
+  override def className = "SporeImpl"
 }
 
 class Spore2Impl[-T1, -T2, +R](val f: (T1, T2) => R) extends Spore2[T1, T2, R] {
