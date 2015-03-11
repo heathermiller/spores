@@ -54,306 +54,13 @@ package object spores {
   private[spores] def debug(s: => String): Unit =
     if (isDebugEnabled) println(s)
 
-  /**
-     spore {
-       val x = outer
-       (y: T) => { ... }
-     }
-   */
-  private def check(c: Context)(funTree: c.Tree, ttpe: c.Type, rtpe: c.Type): c.Tree = {
-    import c.universe._
-
-    def ownerChainContains(sym: Symbol, owner: Symbol): Boolean = {
-      sym != null && (sym.owner == owner || {
-        sym.owner != NoSymbol && ownerChainContains(sym.owner, owner)
-      })
-    }
-
-    // traverse body of `fun` and check that the free vars access only allowed things
-    // `validEnv` == symbols declared in the spore header
-    val (validEnv, funLiteral) = funTree match {
-      case Block(stmts, expr) =>
-        val validVarSyms = stmts.toList flatMap { stmt =>
-          stmt match {
-            case vd @ ValDef(mods, name, tpt, rhs) => List(vd.symbol)
-            case _ =>
-              c.error(stmt.pos, "Only val defs allowed at this position")
-              List()
-          }
-        }
-        validVarSyms foreach { sym => debug("valid: " + sym) }
-        (validVarSyms, expr)
-
-      case expr =>
-        (List(), expr)
-    }
-
-    val captureSym = typeOf[spores.`package`.type].member(newTermName("capture"))
-
-    val (paramSym, retTpe, funBody) = funLiteral match {
-      case fun @ Function(vparams, body) =>
-
-        // contains all symbols found in `capture` syntax
-        var capturedSyms = List[Symbol]()
-
-        // is the use of symbol s allowed via spore rules? (in the spore body)
-        def isSymbolValid(s: Symbol): Boolean =
-          validEnv.contains(s) ||              // is `s` declared in the spore header?
-          capturedSyms.contains(s) ||          // is `s` captured using the `capture` syntax?
-          ownerChainContains(s, fun.symbol) || // is `s` declared within `fun`?
-          s == NoSymbol ||                     // is `s` == `_`?
-          s.isStatic || {
-            c.error(s.pos, "invalid reference to " + s)
-            false
-          }
-
-        // is tree t a path with only components that satisfy pred? (eg stable or lazy)
-        def isPathWith(t: Tree)(pred: TermSymbol => Boolean): Boolean = t match {
-          case sel @ Select(s, _) =>
-            isPathWith(s)(pred) && pred(sel.symbol.asTerm)
-          case id: Ident =>
-            pred(id.symbol.asTerm)
-          case th: This =>
-            true
-          // we can't seem to have a super in paths because of S-1938, pity
-          // https://issues.scala-lang.org/browse/SI-1938
-          // case supr: Super =>
-          //   true
-          case _ =>
-            false
-        }
-
-        // traverse the spore body and collect symbols in `capture` invocations
-        val collectCapturedTraverser = new Traverser {
-          override def traverse(tree: Tree): Unit = tree match {
-            case app @ Apply(fun, List(captured)) if (fun.symbol == captureSym) =>
-              debug("found capture: " + app)
-              if (!isPathWith(captured)(_.isStable))
-                c.error(captured.pos, "Only stable paths can be captured")
-              else if (!isPathWith(captured)(!_.isLazy))
-                c.error(captured.pos, "A captured path cannot contain lazy members")
-              else
-                capturedSyms ::= captured.symbol
-            case _ =>
-              super.traverse(tree)
-          }
-        }
-        debug("collecting captured symbols")
-        collectCapturedTraverser.traverse(body)
-
-        debug(s"checking $body...")
-        // check the spore body, ie for all identifiers, check that they are valid according to spore rules
-        // ie, either declared locally or captured via a `capture` invocation
-        val traverser = new Traverser {
-          override def traverse(tree: Tree) {
-            tree match {
-              case id: Ident =>
-                debug("checking ident " + id)
-                isSymbolValid(id.symbol)
-
-              // x.m().s
-              case sel @ Select(app @ Apply(fun0, args0), _) =>
-                debug("checking select (app): " + sel)
-                if (app.symbol.isStatic) {
-                  debug("OK, fun static")
-                } else fun0 match {
-                  case Select(obj, _) =>
-                    if (ownerChainContains(obj.symbol, fun.symbol)) debug(s"OK, selected on local object $obj")
-                    else c.error(sel.pos, "the fun is not static")
-                  case _ =>
-                    c.error(sel.pos, "the fun is not static")
-                }
-
-              case sel @ Select(pre, _) =>
-                debug("checking select " + sel)
-                if (!sel.symbol.isMethod)
-                  isSymbolValid(sel.symbol)
-
-              case _ =>
-                super.traverse(tree)
-            }
-          }
-        }
-
-        traverser.traverse(body)
-        (vparams.head.symbol, body.tpe, body)
-
-      case _ =>
-        c.error(funLiteral.pos, "Incorrect usage of `spore`: function literal expected")
-        (null, null, null)
-    }
-
-    if (paramSym != null) {
-      val applyParamName = c.fresh(newTermName("x"))
-      val id = Ident(applyParamName)
-      val applyName = newTermName("apply")
-
-      val applyParamValDef = ValDef(Modifiers(Flag.PARAM), applyParamName, TypeTree(paramSym.typeSignature), EmptyTree)
-      val applyParamSymbol = applyParamValDef.symbol
-
-      val symtable = c.universe.asInstanceOf[scala.reflect.internal.SymbolTable]
-
-      if (validEnv.isEmpty) {
-        // replace reference to paramSym with reference to applyParamSymbol
-        val substituter = new symtable.TreeSubstituter(List(paramSym.asInstanceOf[symtable.Symbol]), List(id.asInstanceOf[symtable.Tree]))
-        val newFunBody = substituter.transform(funBody.asInstanceOf[symtable.Tree])
-
-        val nfBody = c.resetLocalAttrs(newFunBody.asInstanceOf[c.universe.Tree])
-
-        val applyDefDef: DefDef = {
-          val applyVParamss = List(List(applyParamValDef))
-          DefDef(NoMods, applyName, Nil, applyVParamss, TypeTree(retTpe), nfBody)
-        }
-
-        val sporeClassName = c.fresh(newTypeName("anonspore"))
-
-        q"""
-          class $sporeClassName extends Spore[$ttpe, $rtpe] {
-            val className: String = this.getClass.getName
-            $applyDefDef
-          }
-          new $sporeClassName
-        """
-      } else if (validEnv.size == 1) { // TODO: simplify
-        // replace reference to paramSym with reference to applyParamSymbol
-        // and references to captured variables to new fields
-        val capturedTypes = validEnv.map(sym => sym.typeSignature)
-        // println(s"capturedTypes: ${capturedTypes.mkString(",")}")
-
-        val fieldNames = (1 to capturedTypes.size).map(i => newTermName(s"c$i")).toList
-        val fieldIds   = fieldNames.map(n => Ident(n))
-
-        val symsToReplace = (paramSym :: validEnv).map(_.asInstanceOf[symtable.Symbol])
-        val idsToSubstitute = (id :: fieldIds).map(_.asInstanceOf[symtable.Tree])
-
-        val substituter = new symtable.TreeSubstituter(symsToReplace, idsToSubstitute)
-        val newFunBody = substituter.transform(funBody.asInstanceOf[symtable.Tree])
-
-        val nfBody = c.resetLocalAttrs(newFunBody.asInstanceOf[c.universe.Tree])
-        val applyDefDef: DefDef = {
-          val applyVParamss = List(List(applyParamValDef))
-          DefDef(NoMods, applyName, Nil, applyVParamss, TypeTree(retTpe), nfBody)
-        }
-
-        val rhss = funTree match {
-          case Block(stmts, expr) =>
-            stmts.toList flatMap { stmt =>
-              stmt match {
-                case vd @ ValDef(mods, name, tpt, rhs) => List(rhs)
-                case _ =>
-                  c.error(stmt.pos, "Only val defs allowed at this position")
-                  List()
-              }
-            }
-        }
-
-        val sporeClassName = c.fresh(newTypeName("anonspore"))
-        val initializerNames = (1 to capturedTypes.size).map(i => c.fresh(newTermName(s"initialize$i")))
-
-        val initializerName = c.fresh(newTermName(s"initialize"))
-        val initializerTrees = fieldNames.zip(rhss).zipWithIndex.map {
-          case ((n, rhs), i) =>
-            val t = newTypeName("C" + (i+1))
-            q"$initializerName.$n = $rhs.asInstanceOf[$initializerName.$t]"
-        }
-
-        val fieldTrees = fieldNames.zipWithIndex.map {
-          case (n, i) =>
-            val t = newTypeName("C" + (i+1))
-            q"var $n: $t = _"
-        }
-
-        val superclassName = newTypeName(s"SporeC${capturedTypes.size}")
-        val captureTypeTree = (if (capturedTypes.size == 1) q"type Captured = ${capturedTypes(0)}"
-          else if (capturedTypes.size == 2) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)})"
-          else if (capturedTypes.size == 3) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)})"
-          else if (capturedTypes.size == 4) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)})").asInstanceOf[c.Tree]
-
-        val cTypeTrees = capturedTypes.zipWithIndex.map {
-          case (t, i) =>
-            val n = newTypeName("C" + (i + 1))
-            q"type $n = $t"
-        }
-
-        q"""
-          final class $sporeClassName extends $superclassName[$ttpe, $rtpe] {
-            $captureTypeTree
-            ..$cTypeTrees
-            ..$fieldTrees
-            val className: String = this.getClass.getName
-            $applyDefDef
-          }
-          val $initializerName = new $sporeClassName
-          ..$initializerTrees
-          $initializerName
-        """
-      } else { // validEnv.size > 1
-        // replace reference to paramSym with reference to applyParamSymbol
-        // and references to captured variables to new fields
-        val capturedTypes = validEnv.map(sym => sym.typeSignature)
-        // println(s"capturedTypes: ${capturedTypes.mkString(",")}")
-
-        val symsToReplace = (paramSym :: validEnv).map(_.asInstanceOf[symtable.Symbol])
-        val newTrees = (1 to validEnv.size).map(i => Select(Ident(newTermName("captured")), newTermName(s"_$i"))).toList
-        val treesToSubstitute = (id :: newTrees).map(_.asInstanceOf[symtable.Tree])
-
-        val substituter = new symtable.TreeSubstituter(symsToReplace, treesToSubstitute)
-        val newFunBody = substituter.transform(funBody.asInstanceOf[symtable.Tree])
-
-        val nfBody = c.resetLocalAttrs(newFunBody.asInstanceOf[c.universe.Tree])
-        val applyDefDef: DefDef = {
-          val applyVParamss = List(List(applyParamValDef))
-          DefDef(NoMods, applyName, Nil, applyVParamss, TypeTree(retTpe), nfBody)
-        }
-
-        val rhss = funTree match {
-          case Block(stmts, expr) =>
-            stmts.toList flatMap { stmt =>
-              stmt match {
-                case vd @ ValDef(mods, name, tpt, rhs) => List(rhs)
-                case _ =>
-                  c.error(stmt.pos, "Only val defs allowed at this position")
-                  List()
-              }
-            }
-        }
-
-        val sporeClassName  = c.fresh(newTypeName("anonspore"))
-        val initializerName = c.fresh(newTermName(s"initialize"))
-        val initializerTree = q"$initializerName.captured = (..$rhss)"
-        val superclassName  = newTypeName(s"SporeWithEnv")
-
-        val captureTypeTree = (if (capturedTypes.size == 2) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)})"
-          else if (capturedTypes.size == 3) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)})"
-          else if (capturedTypes.size == 4) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)})"
-          else if (capturedTypes.size == 5) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)}, ${capturedTypes(4)})"
-          else if (capturedTypes.size == 6) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)}, ${capturedTypes(4)}, ${capturedTypes(5)})"
-          else if (capturedTypes.size == 7) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)}, ${capturedTypes(4)}, ${capturedTypes(5)}, ${capturedTypes(6)})"
-          else if (capturedTypes.size == 8) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)}, ${capturedTypes(4)}, ${capturedTypes(5)}, ${capturedTypes(6)}, ${capturedTypes(7)})").asInstanceOf[c.Tree]
-
-        q"""
-          final class $sporeClassName extends $superclassName[$ttpe, $rtpe] {
-            $captureTypeTree
-            val className: String = this.getClass.getName
-            $applyDefDef
-          }
-          val $initializerName = new $sporeClassName
-          $initializerTree
-          $initializerName
-        """
-      }
-    } else {
-      ???
-    }
-  }
-
-
   def sporeImpl[T: c.WeakTypeTag, R: c.WeakTypeTag](c: Context)(fun: c.Expr[T => R]): c.Expr[Spore[T, R]] = {
     import c.universe._
 
     // check Spore constraints
     // TODO: the last 2 arguments could be passed implicitly
-    val tree = check(c)(fun.tree, weakTypeOf[T], weakTypeOf[R])
+    val impl = new MacroImpl[c.type](c)
+    val tree = impl.check(fun.tree, weakTypeOf[T], weakTypeOf[R])
 
     c.Expr[Spore[T, R]](tree)
   }
@@ -362,22 +69,20 @@ package object spores {
     import c.universe._
 
     // check Spore constraints
-    check(c)(fun.tree, null, null)
+    val impl = new MacroImpl[c.type](c)
+    val tree = impl.check2(fun.tree, List(weakTypeOf[R], weakTypeOf[T1], weakTypeOf[T2]))
 
-    reify {
-      new Spore2Impl(fun.splice)
-    }
+    c.Expr[Spore2[T1, T2, R]](tree)
   }
 
   def spore3Impl[T1: c.WeakTypeTag, T2: c.WeakTypeTag, T3: c.WeakTypeTag, R: c.WeakTypeTag](c: Context)(fun: c.Expr[(T1, T2, T3) => R]): c.Expr[Spore3[T1, T2, T3, R]] = {
     import c.universe._
 
     // check Spore constraints
-    check(c)(fun.tree, null, null)
+    val impl = new MacroImpl[c.type](c)
+    val tree = impl.check2(fun.tree, List(weakTypeOf[R], weakTypeOf[T1], weakTypeOf[T2], weakTypeOf[T3]))
 
-    reify {
-      new Spore3Impl(fun.splice)
-    }
+    c.Expr[Spore3[T1, T2, T3, R]](tree)
   }
 
   // type constraint checking idea

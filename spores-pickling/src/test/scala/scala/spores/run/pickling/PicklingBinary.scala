@@ -18,6 +18,15 @@ trait Emitter[T] {
   def done(): Unit
 }
 
+class TestEmitter extends Emitter[String] {
+  val builder = new StringBuilder()
+  def emit(v: String)(implicit pickler: Pickler[String], unpickler: Unpickler[String]): Unit =
+    builder.append(v)
+  def done(): Unit = {
+    // do nothing
+  }
+}
+
 @RunWith(classOf[JUnit4])
 class PicklingBinarySpec {
   @Test
@@ -62,5 +71,59 @@ class PicklingBinarySpec {
     val p = s.pickle
     val s2 = p.unpickle[Spore[Int, Int]]
     assert(s2(10) == 11)
+  }
+
+  @Test
+  def testSpore2WithEnv(): Unit = {
+    val maxSize = 20
+
+    val s = spore {
+        val chunkSize = maxSize / 2
+        val chunkIndex = 0
+        (elem: (String, Int), emit: Emitter[String]) =>
+          val cond1 = elem._2 >= chunkIndex * chunkSize
+          val plusOne = chunkIndex+1
+          val cond2 = elem._2 < plusOne * chunkSize
+          if (cond1 && cond2) emit.emit(elem._1)
+    }
+
+    val p = s.pickle
+    val s2 = p.unpickle[Spore2[(String, Int), Emitter[String], Unit]]
+
+    val testEmitter = new TestEmitter
+    s2(("hello, " -> 0), testEmitter)
+    s2(("world!" -> 9), testEmitter)
+    assert(testEmitter.builder.toString == "hello, world!")
+  }
+
+  @Test
+  def testSpore3WithoutEnv(): Unit = {
+    val s = spore {
+      (x: Int, y: String, z: Emitter[String]) =>
+        if (x < 10) z.emit(y)
+    }
+    val p = s.pickle
+    val s2 = p.unpickle[Spore3[Int, String, Emitter[String], Unit]]
+    val testEmitter = new TestEmitter
+    s2(9, "hello", testEmitter)
+    assert(testEmitter.builder.toString == "hello")
+  }
+
+  @Test
+  def testSpore3WithEnv(): Unit = {
+    val maxSize = 10
+    val factor  = 2
+    val s = spore {
+      val localMaxSize = maxSize
+      val localFactor  = factor
+      (x: Int, y: String, z: Emitter[String]) =>
+        val limit = localMaxSize * localFactor
+        if (x < limit) z.emit(y)
+    }
+    val p = s.pickle
+    val s2 = p.unpickle[Spore3[Int, String, Emitter[String], Unit]]
+    val testEmitter = new TestEmitter
+    s2(19, "hello", testEmitter)
+    assert(testEmitter.builder.toString == "hello")
   }
 }

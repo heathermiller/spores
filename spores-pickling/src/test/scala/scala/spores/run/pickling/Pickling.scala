@@ -133,6 +133,21 @@ class PicklingSpec {
   }
 
   @Test
+  def `simple pickling of spore with two parameters and two captured variables`() {
+    val v1 = 10
+    val v2 = "hello"
+    val s = spore {
+      val c1 = v1
+      val c2 = v2
+      (x: Int, y: String) => s"args: $x, $y, c1: $c1, c2: $c2"
+    }
+    val res  = s.pickle
+    val up   = res.unpickle[Spore2[Int, String, String]]
+    val res2 = up(5, "hi")
+    assert(res2 == "args: 5, hi, c1: 10, c2: hello")
+  }
+
+  @Test
   def `simple pickling of spore with three parameters`() {
     val s = spore {
       (x: Int, s: String, c: Char) => s"arg1: $x, arg2: $s, arg3: $c"
