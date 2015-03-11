@@ -168,11 +168,8 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
       val applyDefDef = processFunctionBody(substituter, funBody)
 
       if (paramSyms.size == 2) {
-        val rtpe  = tpes(0)
-        val t1tpe = tpes(1)
-        val t2tpe = tpes(2)
         q"""
-          class $sporeClassName extends scala.spores.Spore2[$t1tpe, $t2tpe, $rtpe] {
+          class $sporeClassName extends scala.spores.Spore2[${tpes(1)}, ${tpes(2)}, ${tpes(0)}] {
             this._className = this.getClass.getName
             $applyDefDef
           }
@@ -221,11 +218,8 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
           else if (capturedTypes.size == 8) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)}, ${capturedTypes(4)}, ${capturedTypes(5)}, ${capturedTypes(6)}, ${capturedTypes(7)})").asInstanceOf[c.Tree]
 
         if (paramSyms.size == 2) {
-          val rtpe  = tpes(0)
-          val t1tpe = tpes(1)
-          val t2tpe = tpes(2)
           q"""
-            final class $sporeClassName extends scala.spores.Spore2WithEnv[$t1tpe, $t2tpe, $rtpe] {
+            final class $sporeClassName extends scala.spores.Spore2WithEnv[${tpes(1)}, ${tpes(2)}, ${tpes(0)}] {
               $captureTypeTree
               this._className = this.getClass.getName
               $applyDefDef
