@@ -6,10 +6,23 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
 
+
+class C {
+  def m(i: Int): Any = "example " + i
+}
+
+package somepackage {
+  package nested {
+    object TopLevelObject {
+      val f = new C
+    }
+  }
+}
+
 @RunWith(classOf[JUnit4])
 class BasicSpec {
   @Test
-  def `simple spore transformation`() {
+  def `simple spore transformation`(): Unit = {
     val v1 = 10
     val s: Spore[Int, String] = spore {
       val c1 = v1
@@ -18,7 +31,18 @@ class BasicSpec {
 
     assert(s(20) == "arg: 20, c1: 10")
   }
+
+  @Test
+  def testInvocationTopLevelObject(): Unit = {
+    val s = spore {
+      (x: Int) =>
+        val s1 = somepackage.nested.TopLevelObject.f.m(x).asInstanceOf[String]
+        s1 + "!"
+    }
+    assert(s(5) == "example 5!")
+  }
 }
+
 
 // this is just to test that `super` is judged by the framework as a stable path
 class SuperTest {
@@ -37,7 +61,7 @@ class StablePathSpec extends SuperTest {
   val v0 = 12
 
   @Test
-  def `can capture this in a stable path`() {
+  def `can capture this in a stable path`(): Unit = {
     val s: Spore[Int, String] = spore {
       (x: Int) => s"${capture(this.v0)}"
     }
@@ -57,7 +81,7 @@ class StablePathSpec extends SuperTest {
   // }
 
   @Test
-  def `can capture an innocuous simple stable path`() {
+  def `can capture an innocuous simple stable path`(): Unit = {
     object Innocuous {
       val cute = "fluffy"
     }
@@ -69,7 +93,7 @@ class StablePathSpec extends SuperTest {
   }
 
   @Test
-  def `can capture an innocuous stable path in a package`() {
+  def `can capture an innocuous stable path in a package`(): Unit = {
     val s: Spore[Int, String] = spore {
       (x: Int) => s"${capture(stablePathPkg.StablePathObj.kitteh)}"
     }

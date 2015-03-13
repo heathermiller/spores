@@ -14,6 +14,12 @@ import scala.reflect.macros.Context
 private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
   import c.universe._
 
+  /* Checks whether the owner chain of `sym` contains `owner`.
+   *
+   * @param sym   the symbol to be checked
+   * @param owner the owner symbol that we try to find
+   * @return      whether `owner` is a direct or indirect owner of `sym`
+   */
   def ownerChainContains(sym: Symbol, owner: Symbol): Boolean =
     sym != null && (sym.owner == owner || {
       sym.owner != NoSymbol && ownerChainContains(sym.owner, owner)
@@ -92,8 +98,8 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
         collectCapturedTraverser.traverse(body)
 
         debug(s"checking $body...")
-        // check the spore body, ie for all identifiers, check that they are valid according to spore rules
-        // ie, either declared locally or captured via a `capture` invocation
+        // check the spore body, i.e., for each identifier, check that it is valid according to spore rules
+        // i.e., either declared locally or captured via a `capture` invocation
         val traverser = new Traverser {
           override def traverse(tree: Tree) {
             tree match {
@@ -105,13 +111,21 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
               case sel @ Select(app @ Apply(fun0, args0), _) =>
                 debug("checking select (app): " + sel)
                 if (app.symbol.isStatic) {
-                  debug("OK, fun static")
+                  debug(s"OK, invocation of '$app' is static")
                 } else fun0 match {
                   case Select(obj, _) =>
                     if (ownerChainContains(obj.symbol, fun.symbol)) debug(s"OK, selected on local object $obj")
-                    else c.error(sel.pos, "the fun is not static")
+                    else {
+                      // the invocation is OK if `obj` is transitively selected from a top-level object
+                      debug(s"checking whether $obj is transitively selected from a top-level object...")
+                      val objIsStatic = obj.symbol.isStatic
+                      debug(s"$obj.symbol.isStatic: $objIsStatic")
+                      if (!objIsStatic)
+                        c.error(sel.pos, s"the invocation of '$fun0' is not static")
+                    }
+
                   case _ =>
-                    c.error(sel.pos, "the fun is not static")
+                    c.error(sel.pos, s"the invocation of '$fun0' is not static")
                 }
 
               case sel @ Select(pre, _) =>

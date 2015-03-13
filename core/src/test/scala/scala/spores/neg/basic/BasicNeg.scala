@@ -52,6 +52,45 @@ class NegSpec {
       """
     }
   }
+
+  @Test
+  def testInvalidReference(): Unit = {
+    expectError("invalid reference") {
+      """
+        import scala.spores._
+        val outer = "hello"
+        val s = spore {
+          (x: Int) =>
+            val s1 = outer
+            s1 + "!"
+        }
+      """
+    }
+  }
+
+  @Test
+  def testNonStaticInvocationNotAllowed(): Unit = {
+    expectError("the invocation of 'outerObject.m' is not static") {
+      """
+        import scala.spores._
+
+        class C {
+          def m(i: Int): Any = "example " + i
+        }
+
+        object TopLevelObject {
+          val f = new C
+        }
+
+        val outerObject = TopLevelObject.f
+        val s = spore {
+          (x: Int) =>
+            val s1 = outerObject.m(x).asInstanceOf[String]
+            s1 + "!"
+        }
+      """
+    }
+  }
 }
 
 @RunWith(classOf[JUnit4])
