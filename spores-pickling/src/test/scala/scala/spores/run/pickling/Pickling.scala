@@ -15,7 +15,7 @@ import SporePickler._
 @RunWith(classOf[JUnit4])
 class PicklingSpec {
   @Test
-  def `pickle/unpickle to/from JSON`() {
+  def `pickle/unpickle to/from JSON`(): Unit = {
     val v1 = 10
     val s = spore {
       val c1 = v1
@@ -44,7 +44,7 @@ class PicklingSpec {
   }
 
   @Test
-  def `simplified spore pickling`() {
+  def `simplified spore pickling`(): Unit = {
     val v1 = 10
     val s = spore {
       val c1 = v1
@@ -65,7 +65,7 @@ class PicklingSpec {
   }
 
   @Test
-  def `pickling spore with two captured variables`() {
+  def `pickling spore with two captured variables`(): Unit = {
     val v1 = 10
     val v2 = "hello"
     val s = spore {
@@ -98,7 +98,7 @@ class PicklingSpec {
   }
 
   @Test
-  def `simple pickling of spore with two captured variables`() {
+  def `simple pickling of spore with two captured variables`(): Unit = {
     val v1 = 10
     val v2 = "hello"
     val s = spore {
@@ -113,7 +113,7 @@ class PicklingSpec {
   }
 
   @Test
-  def `simple pickling of spore with one parameter`() {
+  def `simple pickling of spore with one parameter`(): Unit = {
     val s = spore { (l: List[Int]) => l.map(_ + 1) }
     val res  = s.pickle
     val up   = res.unpickle[Spore[List[Int], List[Int]]]
@@ -122,7 +122,7 @@ class PicklingSpec {
   }
 
   @Test
-  def `simple pickling of spore with two parameters`() {
+  def `simple pickling of spore with two parameters`(): Unit = {
     val s = spore {
       (x: Int, s: String) => s"arg1: $x, arg2: $s"
     }
@@ -133,7 +133,7 @@ class PicklingSpec {
   }
 
   @Test
-  def `simple pickling of spore with two parameters and two captured variables`() {
+  def `simple pickling of spore with two parameters and two captured variables`(): Unit = {
     val v1 = 10
     val v2 = "hello"
     val s = spore {
@@ -148,7 +148,7 @@ class PicklingSpec {
   }
 
   @Test
-  def `simple pickling of spore with three parameters`() {
+  def `simple pickling of spore with three parameters`(): Unit = {
     val s = spore {
       (x: Int, s: String, c: Char) => s"arg1: $x, arg2: $s, arg3: $c"
     }
@@ -156,5 +156,26 @@ class PicklingSpec {
     val up   = res.unpickle[Spore3[Int, String, Char, String]]
     val res2 = up(5, "hi", '-')
     assert(res2 == "arg1: 5, arg2: hi, arg3: -")
+  }
+
+  def doPickle[T <: Spore[Int, String]: Pickler: Unpickler](spor: T) = {
+    val unpickler = implicitly[Unpickler[T]]
+    val res       = spor.pickle
+    val reader    = pickleFormat.createReader(res)
+    val spor2     = unpickler.unpickleEntry(reader).asInstanceOf[Spore[Int, String]]
+    assert(spor2(5) == spor(5))
+    assert(spor2.getClass.getName == spor.getClass.getName)
+  }
+
+  @Test
+  def testPickleUnpickleSporeWithTypeRefinement(): Unit = {
+    val v1 = 10
+    val v2 = "hello"
+    val s = spore {
+      val c1 = v1
+      val c2 = v2
+      (x: Int) => s"arg: $x, c1: $c1, c2: $c2"
+    }
+    doPickle(s)
   }
 }

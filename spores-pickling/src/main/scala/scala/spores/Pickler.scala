@@ -593,7 +593,7 @@ object SporePickler {
     """
   }
 
-  implicit def genSporeCMUnpickler[T, R, U]: Unpickler[Spore[T, R] { type Captured = U }] =
+  implicit def genSporeCMUnpickler[T, R, U]: Unpickler[SporeWithEnv[T, R] { type Captured = U }] =
     macro genSporeCMUnpicklerImpl[T, R, U]
 
   def genSporeCMUnpicklerImpl[T: c.WeakTypeTag, R: c.WeakTypeTag, U: c.WeakTypeTag](c: Context): c.Tree = {
@@ -612,13 +612,12 @@ object SporePickler {
 
     debug(s"T: $ttpe, R: $rtpe")
 
-    val unpicklerName = c.fresh(newTermName("SporeUnpickler"))
-    // TODO: the below unpickling method does not correctly restore the spore's _className field
+    val unpicklerName = c.fresh(newTermName("SporeCMUnpickler"))
 
     q"""
-      object $unpicklerName extends scala.pickling.Unpickler[scala.spores.Spore[$ttpe, $rtpe] { type Captured = $utpe }] {
+      object $unpicklerName extends scala.pickling.Unpickler[scala.spores.SporeWithEnv[$ttpe, $rtpe] { type Captured = $utpe }] {
         def tag =
-          implicitly[scala.pickling.FastTypeTag[scala.spores.Spore[$ttpe, $rtpe] { type Captured = $utpe }]]
+          implicitly[scala.pickling.FastTypeTag[scala.spores.SporeWithEnv[$ttpe, $rtpe] { type Captured = $utpe }]]
 
         def unpickle(tag: String, reader: scala.pickling.PReader): Any = {
           val reader2 = reader.readField("className")
@@ -631,7 +630,14 @@ object SporePickler {
 
           // println("creating instance of class " + result)
           val clazz = java.lang.Class.forName(result.asInstanceOf[String])
-          val sporeInst = scala.concurrent.util.Unsafe.instance.allocateInstance(clazz).asInstanceOf[scala.spores.SporeWithEnv[$ttpe, $rtpe]]
+          val sporeInst = (try clazz.newInstance() catch {
+            case t: Throwable =>
+              val inst = scala.concurrent.util.Unsafe.instance.allocateInstance(clazz)
+              val privateClassNameField = clazz.getDeclaredField("_className")
+              privateClassNameField.setAccessible(true)
+              privateClassNameField.set(inst, result)
+              inst
+          }).asInstanceOf[scala.spores.SporeWithEnv[$ttpe, $rtpe]]
 
           val reader3 = reader.readField("captured")
           val tag3 = reader3.beginEntry()
