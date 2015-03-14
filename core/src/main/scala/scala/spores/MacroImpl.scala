@@ -25,6 +25,17 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
       sym.owner != NoSymbol && ownerChainContains(sym.owner, owner)
     })
 
+  /* Checks whether `member` is selected from a static selector, or whether
+   * its selector is transitively selected from a static symbol.
+   */
+  def selectorIsStatic(member: Tree): Boolean = member match {
+    case Select(selector, member0) =>
+      val selStatic = selector.symbol.isStatic
+      debug(s"checking whether $selector is static...$selStatic")
+      selStatic || selectorIsStatic(selector)
+    case _ => false
+  }
+
   def conforms(funTree: c.Tree): (List[Symbol], Type, Tree, List[Symbol]) = {
     // traverse body of `fun` and check that the free vars access only allowed things
     // `validEnv` == symbols declared in the spore header
@@ -118,7 +129,7 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
                     else {
                       // the invocation is OK if `obj` is transitively selected from a top-level object
                       debug(s"checking whether $obj is transitively selected from a top-level object...")
-                      val objIsStatic = obj.symbol.isStatic
+                      val objIsStatic = obj.symbol.isStatic || selectorIsStatic(obj)
                       debug(s"$obj.symbol.isStatic: $objIsStatic")
                       if (!objIsStatic)
                         c.error(sel.pos, s"the invocation of '$fun0' is not static")

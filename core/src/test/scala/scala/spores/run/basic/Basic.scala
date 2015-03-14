@@ -11,9 +11,13 @@ class C {
   def m(i: Int): Any = "example " + i
 }
 
+trait D {
+  def g = new C
+}
+
 package somepackage {
   package nested {
-    object TopLevelObject {
+    object TopLevelObject extends D {
       val f = new C
     }
   }
@@ -33,10 +37,20 @@ class BasicSpec {
   }
 
   @Test
-  def testInvocationTopLevelObject(): Unit = {
+  def testInvocationTopLevelObject1(): Unit = {
     val s = spore {
       (x: Int) =>
         val s1 = somepackage.nested.TopLevelObject.f.m(x).asInstanceOf[String]
+        s1 + "!"
+    }
+    assert(s(5) == "example 5!")
+  }
+
+  @Test
+  def testInvocationTopLevelObject2(): Unit = {
+    val s = spore {
+      (x: Int) =>
+        val s1 = somepackage.nested.TopLevelObject.g.m(x).asInstanceOf[String]
         s1 + "!"
     }
     assert(s(5) == "example 5!")
