@@ -55,6 +55,17 @@ class BasicSpec {
     }
     assert(s(5) == "example 5!")
   }
+
+  @Test
+  def testClassOfLiteral(): Unit = {
+    val s = spore {
+      val y = 3
+      (x: Int) =>
+        val name = classOf[C].getName
+        name + (x * y)
+    }
+    assert(s(2).contains("C"))
+  }
 }
 
 
