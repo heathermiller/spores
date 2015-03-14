@@ -32,7 +32,7 @@ class NegSpec {
         import scala.spores._
         lazy val v1 = 10
         val s: Spore[Int, Unit] = spore {
-          (x: Int) => println(s"arg: $x, c1: ${capture(v1)}")
+          (x: Int) => println("arg: " + x + ", c1: " + capture(v1))
         }
       """
     }
@@ -47,7 +47,7 @@ class NegSpec {
         }
         import scala.spores._
         val s: Spore[Int, Unit] = spore {
-          (x: Int) => println(s"arg: $x, c1: ${capture(NoLazyValsObj.v1)}")
+          (x: Int) => println("arg: " + x + ", c1: " + capture(NoLazyValsObj.v1))
         }
       """
     }
@@ -63,6 +63,27 @@ class NegSpec {
           (x: Int) =>
             val s1 = outer
             s1 + "!"
+        }
+      """
+    }
+  }
+
+  @Test
+  def testInvalidReference2(): Unit = {
+    expectError("invalid reference") {
+      """
+        import scala.spores._
+        class C {
+          object A {
+            def foo(a: Int, b: Int): Int =
+              a * b * 3
+          }
+          def m(): Unit = {
+            val s = spore {
+              val y = 3
+              (x: Int) => A.foo(x, y)
+            }
+          }
         }
       """
     }
