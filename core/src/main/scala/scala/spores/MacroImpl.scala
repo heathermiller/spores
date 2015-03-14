@@ -69,10 +69,7 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
           capturedSyms.contains(s) ||          // is `s` captured using the `capture` syntax?
           ownerChainContains(s, fun.symbol) || // is `s` declared within `fun`?
           s == NoSymbol ||                     // is `s` == `_`?
-          s.isStatic || {
-            c.error(s.pos, "invalid reference to " + s)
-            false
-          }
+          s.isStatic
 
         // is tree t a path with only components that satisfy pred? (eg stable or lazy)
         def isPathWith(t: Tree)(pred: TermSymbol => Boolean): Boolean = t match {
@@ -89,6 +86,12 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
           case _ =>
             false
         }
+
+        def isPathValid(tree: Tree): Boolean =
+          isSymbolValid(tree.symbol) || (tree match {
+            case Select(pre, _) => isPathValid(pre)
+            case _ => false
+          })
 
         // traverse the spore body and collect symbols in `capture` invocations
         val collectCapturedTraverser = new Traverser {
@@ -116,7 +119,8 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
             tree match {
               case id: Ident =>
                 debug("checking ident " + id)
-                isSymbolValid(id.symbol)
+                if (!isSymbolValid(id.symbol))
+                  c.error(tree.pos, "invalid reference to " + id.symbol)
 
               // x.m().s
               case sel @ Select(app @ Apply(fun0, args0), _) =>
@@ -141,8 +145,13 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
 
               case sel @ Select(pre, _) =>
                 debug("checking select " + sel)
-                if (!sel.symbol.isMethod)
-                  isSymbolValid(sel.symbol)
+
+                val valid =
+                  if (!sel.symbol.isMethod) isPathValid(sel)
+                  else isPathValid(sel) || isPathValid(pre)
+
+                if (!valid)
+                  c.error(tree.pos, "invalid reference to " + sel.symbol)
 
               case _ =>
                 super.traverse(tree)

@@ -114,4 +114,13 @@ class StablePathSpec extends SuperTest {
 
     assert(s(42) == "i can haz stable path")
   }
+
+  @Test
+  def testIssue4(): Unit = {
+    val s = spore {
+      val y = 3
+      (x: Int) => x * y
+    }
+    assert(true)
+  }
 }
