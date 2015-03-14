@@ -69,7 +69,8 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
           capturedSyms.contains(s) ||          // is `s` captured using the `capture` syntax?
           ownerChainContains(s, fun.symbol) || // is `s` declared within `fun`?
           s == NoSymbol ||                     // is `s` == `_`?
-          s.isStatic
+          s.isStatic ||
+          s.owner == definitions.PredefModule
 
         // is tree t a path with only components that satisfy pred? (eg stable or lazy)
         def isPathWith(t: Tree)(pred: TermSymbol => Boolean): Boolean = t match {
@@ -87,11 +88,32 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
             false
         }
 
-        def isPathValid(tree: Tree): Boolean =
-          isSymbolValid(tree.symbol) || (tree match {
-            case Select(pre, _) => isPathValid(pre)
-            case _ => false
-          })
+        def isPathValid(tree: Tree): (Boolean, Option[Tree]) = {
+          debug(s"checking isPathValid for $tree [${tree.symbol}]...")
+          debug(s"tree class: ${tree.getClass.getName}")
+          if (tree.symbol != null && isSymbolValid(tree.symbol)) (true, None)
+          else tree match {
+            case Select(pre, sel) =>
+              debug(s"case 1: Select($pre, $sel)")
+              isPathValid(pre)
+            case Apply(Select(pre, _), _) =>
+              debug(s"case 2: Apply(Select, _)")
+              isPathValid(pre)
+            case TypeApply(Select(pre, _), _) =>
+              debug("case 3: TypeApply(Select, _)")
+              isPathValid(pre)
+            case TypeApply(fun, _) =>
+              debug("case 4: TypeApply")
+              isPathValid(fun)
+            case Literal(Constant(_)) | New(_) =>
+              (true, None)
+            case id: Ident =>
+              (isSymbolValid(id.symbol), None)
+            case _ =>
+              debug("case 7: _")
+              (false, Some(tree))
+          }
+        }
 
         // traverse the spore body and collect symbols in `capture` invocations
         val collectCapturedTraverser = new Traverser {
@@ -122,6 +144,9 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
                 if (!isSymbolValid(id.symbol))
                   c.error(tree.pos, "invalid reference to " + id.symbol)
 
+              case th: This =>
+                c.error(tree.pos, "invalid reference to " + th.symbol)
+
               // x.m().s
               case sel @ Select(app @ Apply(fun0, args0), _) =>
                 debug("checking select (app): " + sel)
@@ -146,12 +171,16 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
               case sel @ Select(pre, _) =>
                 debug("checking select " + sel)
 
-                val valid =
-                  if (!sel.symbol.isMethod) isPathValid(sel)
-                  else isPathValid(sel) || isPathValid(pre)
-
-                if (!valid)
-                  c.error(tree.pos, "invalid reference to " + sel.symbol)
+                isPathValid(sel) match {
+                  case (false, None) =>
+                    c.error(tree.pos, "invalid reference to " + sel.symbol)
+                  case (false, Some(subtree)) =>
+                    traverse(subtree)
+                  case (true, None) =>
+                    // do nothing
+                  case (true, Some(subtree)) =>
+                    // do nothing
+                }
 
               case _ =>
                 super.traverse(tree)
