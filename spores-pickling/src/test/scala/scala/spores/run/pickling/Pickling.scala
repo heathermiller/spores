@@ -33,7 +33,7 @@ class PicklingSpec {
     val res = builder.result()
 
     assert(res.value.toString.endsWith("""
-  "c1": 10
+  "captured": 10
 }"""))
 
     val reader = format.createReader(res.asInstanceOf[format.PickleType])
@@ -60,7 +60,7 @@ class PicklingSpec {
     }
 
     assert(res.value.toString.endsWith("""
-      |  "c1": 10
+      |  "captured": 10
       |}""".stripMargin))
   }
 

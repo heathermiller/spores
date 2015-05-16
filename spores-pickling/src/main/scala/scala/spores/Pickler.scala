@@ -39,7 +39,7 @@ object SporePickler {
 
     val numVarsCaptured = utpe.typeArgs.size
     // println(s"numVarsCaptured = $numVarsCaptured")
-    val sporeTypeName = newTypeName("SporeC1")
+    val sporeTypeName = newTypeName("SporeWithEnv")
 
     debug(s"T: $ttpe, R: $rtpe, U: $utpe")
 
@@ -65,10 +65,10 @@ object SporePickler {
             scala.pickling.pickler.AllPicklers.stringPickler.pickle(picklee.className, b)
           })
 
-          builder.putField("c1", b => {
+          builder.putField("captured", b => {
             b.hintTag(capturedPickler.tag)
             ${if (isEffectivelyPrimitive(utpe)) q"b.hintStaticallyElidedType()" else q""}
-            capturedPickler.pickle(picklee.asInstanceOf[$sporeTypeName[$ttpe, $rtpe]].c1.asInstanceOf[$utpe], b)
+            capturedPickler.pickle(picklee.asInstanceOf[$sporeTypeName[$ttpe, $rtpe]].captured.asInstanceOf[$utpe], b)
           })
 
           builder.endEntry()
@@ -94,13 +94,13 @@ object SporePickler {
           val clazz = java.lang.Class.forName(result.asInstanceOf[String])
           val sporeInst = scala.concurrent.util.Unsafe.instance.allocateInstance(clazz).asInstanceOf[$sporeTypeName[$ttpe, $rtpe] { type Captured = $utpe }]
 
-          val reader3 = reader.readField("c1")
+          val reader3 = reader.readField("captured")
           reader3.hintTag(capturedUnpickler.tag)
           ${if (isEffectivelyPrimitive(utpe)) q"reader3.hintStaticallyElidedType()" else q""}
           val tag3 = reader3.beginEntry()
           val result3 = capturedUnpickler.unpickle(tag3, reader3)
           reader3.endEntry()
-          sporeInst.c1 = result3.asInstanceOf[sporeInst.C1]
+          sporeInst.captured = result3.asInstanceOf[sporeInst.Captured]
 
           sporeInst
         }
