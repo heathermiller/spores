@@ -349,19 +349,17 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
           }
           new $sporeClassName
         """
-      } else if (validEnv.size == 1) { // TODO: simplify
+      } else if (validEnv.size == 1) {
         // replace reference to paramSym with reference to applyParamSymbol
-        // and references to captured variables to new fields
+        // and reference to captured variable to new field
         val capturedTypes = validEnv.map(sym => sym.typeSignature)
         debug(s"capturedTypes: ${capturedTypes.mkString(",")}")
 
-        val fieldNames = (1 to capturedTypes.size).map(i => newTermName(s"c$i")).toList
-        val fieldIds   = fieldNames.map(n => Ident(n))
-
         val symsToReplace = (paramSym :: validEnv).map(_.asInstanceOf[symtable.Symbol])
-        val idsToSubstitute = (id :: fieldIds).map(_.asInstanceOf[symtable.Tree])
+        val newTrees = List(Ident(newTermName("captured")))
+        val treesToSubstitute = (id :: newTrees).map(_.asInstanceOf[symtable.Tree])
 
-        val substituter = new symtable.TreeSubstituter(symsToReplace, idsToSubstitute)
+        val substituter = new symtable.TreeSubstituter(symsToReplace, treesToSubstitute)
         val newFunBody = substituter.transform(funBody.asInstanceOf[symtable.Tree])
 
         val nfBody = c.resetLocalAttrs(newFunBody.asInstanceOf[c.universe.Tree])
@@ -381,45 +379,23 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
               }
             }
         }
+        assert(rhss.size == 1)
 
-        val sporeClassName = c.fresh(newTypeName("anonspore"))
-        val initializerNames = (1 to capturedTypes.size).map(i => c.fresh(newTermName(s"initialize$i")))
-
+        val sporeClassName  = c.fresh(newTypeName("anonspore"))
         val initializerName = c.fresh(newTermName(s"initialize"))
-        val initializerTrees = fieldNames.zip(rhss).zipWithIndex.map {
-          case ((n, rhs), i) =>
-            val t = newTypeName("C" + (i+1))
-            q"$initializerName.$n = $rhs.asInstanceOf[$initializerName.$t]"
-        }
+        val initializerTree = q"$initializerName.captured = ${rhss.head}"
+        val superclassName  = newTypeName(s"SporeWithEnv")
 
-        val fieldTrees = fieldNames.zipWithIndex.map {
-          case (n, i) =>
-            val t = newTypeName("C" + (i+1))
-            q"var $n: $t = _"
-        }
-
-        val superclassName = newTypeName(s"SporeC${capturedTypes.size}")
-        val captureTypeTree = (if (capturedTypes.size == 1) q"type Captured = ${capturedTypes(0)}"
-          else if (capturedTypes.size == 2) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)})"
-          else if (capturedTypes.size == 3) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)})"
-          else if (capturedTypes.size == 4) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)})").asInstanceOf[c.Tree]
-
-        val cTypeTrees = capturedTypes.zipWithIndex.map {
-          case (t, i) =>
-            val n = newTypeName("C" + (i + 1))
-            q"type $n = $t"
-        }
+        val captureTypeTree = q"type Captured = ${capturedTypes(0)}"
 
         q"""
           final class $sporeClassName extends $superclassName[$ttpe, $rtpe] {
             $captureTypeTree
-            ..$cTypeTrees
-            ..$fieldTrees
             this._className = this.getClass.getName
             $applyDefDef
           }
           val $initializerName = new $sporeClassName
-          ..$initializerTrees
+          $initializerTree
           $initializerName
         """
       } else { // validEnv.size > 1

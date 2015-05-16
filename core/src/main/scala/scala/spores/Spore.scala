@@ -40,11 +40,6 @@ trait SporeWithEnv[-T, +R] extends Spore[T, R] {
 
 }
 
-trait SporeC1[-T, +R] extends SporeWithEnv[T, R] {
-  type C1
-  var c1: C1
-}
-
 trait Spore2[-T1, -T2, +R] extends Function2[T1, T2, R] {
 
   /** The type of captured variables.
