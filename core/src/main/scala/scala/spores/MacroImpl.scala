@@ -8,7 +8,7 @@
 
 package scala.spores
 
-import scala.reflect.macros.Context
+import scala.reflect.macros.whitebox.Context
 
 
 private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
@@ -55,7 +55,7 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
         (List(), expr)
     }
 
-    val captureSym = typeOf[spores.`package`.type].member(newTermName("capture"))
+    val captureSym = typeOf[spores.`package`.type].member(TermName("capture"))
 
     funLiteral match {
       case fun @ Function(vparams, body) =>
@@ -202,7 +202,7 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
 
     val (paramSyms, retTpe, funBody, validEnv) = conforms(funTree)
 
-    val applyParamNames = for (i <- 0 until paramSyms.size) yield c.fresh(newTermName("x" + i))
+    val applyParamNames = for (i <- 0 until paramSyms.size) yield c.freshName(TermName("x" + i))
     val ids = for (name <- applyParamNames.toList) yield Ident(name)
 
     val applyParamValDefs = for ((applyParamName, paramSym) <- applyParamNames.zip(paramSyms))
@@ -212,18 +212,18 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
 
     def mkApplyDefDef(body: Tree): DefDef = {
       val applyVParamss = List(applyParamValDefs.toList)
-      DefDef(NoMods, newTermName("apply"), Nil, applyVParamss, TypeTree(retTpe), body)
+      DefDef(NoMods, TermName("apply"), Nil, applyVParamss, TypeTree(retTpe), body)
     }
 
     val symtable = c.universe.asInstanceOf[scala.reflect.internal.SymbolTable]
 
     def processFunctionBody(substituter: symtable.TreeSubstituter, funBody: Tree): DefDef = {
       val newFunBody = substituter.transform(funBody.asInstanceOf[symtable.Tree])
-      val nfBody     = c.resetLocalAttrs(newFunBody.asInstanceOf[Tree])
+      val nfBody     = c.untypecheck(newFunBody.asInstanceOf[Tree])
       mkApplyDefDef(nfBody)
     }
 
-    val sporeClassName = c.fresh(newTypeName("anonspore"))
+    val sporeClassName = c.freshName(TypeName("anonspore"))
 
     if (validEnv.isEmpty) {
       // replace references to paramSyms with references to applyParamSymbols
@@ -254,7 +254,7 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
         debug(s"capturedTypes: ${capturedTypes.mkString(",")}")
 
         val symsToReplace     = (paramSyms ::: validEnv).map(_.asInstanceOf[symtable.Symbol])
-        val newTrees          = (1 to validEnv.size).map(i => Select(Ident(newTermName("captured")), newTermName(s"_$i"))).toList
+        val newTrees          = (1 to validEnv.size).map(i => Select(Ident(TermName("captured")), TermName(s"_$i"))).toList
         val treesToSubstitute = (ids ::: newTrees).map(_.asInstanceOf[symtable.Tree])
         val substituter       = new symtable.TreeSubstituter(symsToReplace, treesToSubstitute)
         val applyDefDef       = processFunctionBody(substituter, funBody)
@@ -269,7 +269,7 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
             }
         }
 
-        val initializerName = c.fresh(newTermName(s"initialize"))
+        val initializerName = c.freshName(TermName(s"initialize"))
         val initializerTree = q"$initializerName.captured = (..$rhss)"
 
         val captureTypeTree = (if (capturedTypes.size == 2) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)})"
@@ -319,9 +319,9 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
     val paramSym = paramSyms.head
 
     if (paramSym != null) {
-      val applyParamName = c.fresh(newTermName("x"))
+      val applyParamName = c.freshName(TermName("x"))
       val id = Ident(applyParamName)
-      val applyName = newTermName("apply")
+      val applyName = TermName("apply")
 
       val applyParamValDef = ValDef(Modifiers(Flag.PARAM), applyParamName, TypeTree(paramSym.typeSignature), EmptyTree)
       val applyParamSymbol = applyParamValDef.symbol
@@ -333,14 +333,14 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
         val substituter = new symtable.TreeSubstituter(List(paramSym.asInstanceOf[symtable.Symbol]), List(id.asInstanceOf[symtable.Tree]))
         val newFunBody = substituter.transform(funBody.asInstanceOf[symtable.Tree])
 
-        val nfBody = c.resetLocalAttrs(newFunBody.asInstanceOf[c.universe.Tree])
+        val nfBody = c.untypecheck(newFunBody.asInstanceOf[c.universe.Tree])
 
         val applyDefDef: DefDef = {
           val applyVParamss = List(List(applyParamValDef))
           DefDef(NoMods, applyName, Nil, applyVParamss, TypeTree(retTpe), nfBody)
         }
 
-        val sporeClassName = c.fresh(newTypeName("anonspore"))
+        val sporeClassName = c.freshName(TypeName("anonspore"))
 
         q"""
           class $sporeClassName extends scala.spores.Spore[$ttpe, $rtpe] {
@@ -356,13 +356,13 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
         debug(s"capturedTypes: ${capturedTypes.mkString(",")}")
 
         val symsToReplace = (paramSym :: validEnv).map(_.asInstanceOf[symtable.Symbol])
-        val newTrees = List(Ident(newTermName("captured")))
+        val newTrees = List(Ident(TermName("captured")))
         val treesToSubstitute = (id :: newTrees).map(_.asInstanceOf[symtable.Tree])
 
         val substituter = new symtable.TreeSubstituter(symsToReplace, treesToSubstitute)
         val newFunBody = substituter.transform(funBody.asInstanceOf[symtable.Tree])
 
-        val nfBody = c.resetLocalAttrs(newFunBody.asInstanceOf[c.universe.Tree])
+        val nfBody = c.untypecheck(newFunBody.asInstanceOf[c.universe.Tree])
         val applyDefDef: DefDef = {
           val applyVParamss = List(List(applyParamValDef))
           DefDef(NoMods, applyName, Nil, applyVParamss, TypeTree(retTpe), nfBody)
@@ -381,10 +381,10 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
         }
         assert(rhss.size == 1)
 
-        val sporeClassName  = c.fresh(newTypeName("anonspore"))
-        val initializerName = c.fresh(newTermName(s"initialize"))
+        val sporeClassName  = c.freshName(TypeName("anonspore"))
+        val initializerName = c.freshName(TermName(s"initialize"))
         val initializerTree = q"$initializerName.captured = ${rhss.head}"
-        val superclassName  = newTypeName(s"SporeWithEnv")
+        val superclassName  = TypeName(s"SporeWithEnv")
 
         val captureTypeTree = q"type Captured = ${capturedTypes(0)}"
 
@@ -405,13 +405,13 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
         debug(s"capturedTypes: ${capturedTypes.mkString(",")}")
 
         val symsToReplace = (paramSym :: validEnv).map(_.asInstanceOf[symtable.Symbol])
-        val newTrees = (1 to validEnv.size).map(i => Select(Ident(newTermName("captured")), newTermName(s"_$i"))).toList
+        val newTrees = (1 to validEnv.size).map(i => Select(Ident(TermName("captured")), TermName(s"_$i"))).toList
         val treesToSubstitute = (id :: newTrees).map(_.asInstanceOf[symtable.Tree])
 
         val substituter = new symtable.TreeSubstituter(symsToReplace, treesToSubstitute)
         val newFunBody = substituter.transform(funBody.asInstanceOf[symtable.Tree])
 
-        val nfBody = c.resetLocalAttrs(newFunBody.asInstanceOf[c.universe.Tree])
+        val nfBody = c.untypecheck(newFunBody.asInstanceOf[c.universe.Tree])
         val applyDefDef: DefDef = {
           val applyVParamss = List(List(applyParamValDef))
           DefDef(NoMods, applyName, Nil, applyVParamss, TypeTree(retTpe), nfBody)
@@ -429,10 +429,10 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
             }
         }
 
-        val sporeClassName  = c.fresh(newTypeName("anonspore"))
-        val initializerName = c.fresh(newTermName(s"initialize"))
+        val sporeClassName  = c.freshName(TypeName("anonspore"))
+        val initializerName = c.freshName(TermName(s"initialize"))
         val initializerTree = q"$initializerName.captured = (..$rhss)"
-        val superclassName  = newTypeName(s"SporeWithEnv")
+        val superclassName  = TypeName(s"SporeWithEnv")
 
         val captureTypeTree = (if (capturedTypes.size == 2) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)})"
           else if (capturedTypes.size == 3) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)})"
