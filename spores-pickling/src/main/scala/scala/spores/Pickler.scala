@@ -9,15 +9,15 @@
 package scala.spores
 
 import scala.language.experimental.macros
-import scala.reflect.macros.Context
+import scala.reflect.macros.blackbox.Context
 
 import scala.pickling._
 
 
-object SporePickler {
+object SporePickler extends SimpleSporePicklerImpl {
   /*implicit*/
   def genSporePickler[T, R, U](implicit cPickler: Pickler[U], cUnpickler: Unpickler[U])
-        : Pickler[Spore[T, R] { type Captured = U }] = macro genSporePicklerImpl[T, R, U]
+        : Pickler[Spore[T, R] { type Captured = U }] with Unpickler[Spore[T, R] { type Captured = U }] = macro genSporePicklerImpl[T, R, U]
 
   def genSporePicklerImpl[T: c.WeakTypeTag, R: c.WeakTypeTag, U: c.WeakTypeTag]
         (c: Context)(cPickler: c.Tree, cUnpickler: c.Tree): c.Tree = {
@@ -39,11 +39,11 @@ object SporePickler {
 
     val numVarsCaptured = utpe.typeArgs.size
     // println(s"numVarsCaptured = $numVarsCaptured")
-    val sporeTypeName = newTypeName("SporeWithEnv")
+    val sporeTypeName = TypeName("SporeWithEnv")
 
     debug(s"T: $ttpe, R: $rtpe, U: $utpe")
 
-    val picklerUnpicklerName = c.fresh(newTermName("SporePicklerUnpickler"))
+    val picklerUnpicklerName = c.freshName(TermName("SporePicklerUnpickler"))
     val typeFieldName = """$type"""
 
     // the problem with the following unpickle method is that it doesn't re-initialize the className field correctly.
@@ -112,90 +112,53 @@ object SporePickler {
   implicit def genSimpleSporePickler[T, R]: Pickler[Spore[T, R]] =
     macro genSimpleSporePicklerImpl[T, R]
 
-  def genSimpleSporePicklerImpl[T: c.WeakTypeTag, R: c.WeakTypeTag](c: Context): c.Tree = {
-    import c.universe._
-
-    val ttpe = weakTypeOf[T]
-    val rtpe = weakTypeOf[R]
-
-    debug(s"T: $ttpe, R: $rtpe")
-    val picklerName = c.fresh(newTermName("SimpleSporePickler"))
-
-    q"""
-      object $picklerName extends scala.pickling.Pickler[scala.spores.Spore[$ttpe, $rtpe]] {
-        def tag =
-          implicitly[scala.pickling.FastTypeTag[scala.spores.Spore[$ttpe, $rtpe]]]
-
-        def pickle(picklee: scala.spores.Spore[$ttpe, $rtpe], builder: scala.pickling.PBuilder): Unit = {
-          builder.beginEntry(picklee)
-
-          builder.putField("className", b => {
-            b.hintTag(scala.pickling.FastTypeTag.String)
-            b.hintStaticallyElidedType()
-            scala.pickling.pickler.AllPicklers.stringPickler.pickle(picklee.className, b)
-          })
-
-          builder.endEntry()
-        }
-      }
-      $picklerName
-    """
-  }
-
   implicit def genSimpleSpore2Pickler[T1, T2, R]: Pickler[Spore2[T1, T2, R]] =
     macro genSimpleSpore2PicklerImpl[T1, T2, R]
-
-  def genSimpleSpore2PicklerImpl[T1: c.WeakTypeTag, T2: c.WeakTypeTag, R: c.WeakTypeTag](c: Context): c.Tree = {
-    import c.universe._
-    val t1tpe = weakTypeOf[T1]
-    val t2tpe = weakTypeOf[T2]
-    val rtpe = weakTypeOf[R]
-    val picklerName = c.fresh(newTermName("SimpleSpore2Pickler"))
-
-    q"""
-      object $picklerName extends scala.pickling.Pickler[scala.spores.Spore2[$t1tpe, $t2tpe, $rtpe]] {
-        def tag =
-          implicitly[scala.pickling.FastTypeTag[scala.spores.Spore2[$t1tpe, $t2tpe, $rtpe]]]
-
-        def pickle(picklee: scala.spores.Spore2[$t1tpe, $t2tpe, $rtpe], builder: scala.pickling.PBuilder): Unit = {
-          builder.beginEntry(picklee)
-
-          builder.putField("className", b => {
-            b.hintTag(scala.pickling.FastTypeTag.String)
-            b.hintStaticallyElidedType()
-            scala.pickling.pickler.AllPicklers.stringPickler.pickle(picklee.className, b)
-          })
-
-          builder.endEntry()
-        }
-      }
-      $picklerName
-    """
-  }
 
   implicit def genSimpleSpore3Pickler[T1, T2, T3, R]: Pickler[Spore3[T1, T2, T3, R]] =
     macro genSimpleSpore3PicklerImpl[T1, T2, T3, R]
 
-  def genSimpleSpore3PicklerImpl[T1: c.WeakTypeTag, T2: c.WeakTypeTag, T3: c.WeakTypeTag, R: c.WeakTypeTag](c: Context): c.Tree = {
+  // type `U` </: `Product`
+  implicit def genSporeCSPickler[T, R, U](implicit cPickler: Pickler[U]): Pickler[SporeWithEnv[T, R] { type Captured = U }] =
+    macro genSporeCSPicklerImpl[T, R, U]
+
+  def genSporeCSPicklerImpl[T: c.WeakTypeTag, R: c.WeakTypeTag, U: c.WeakTypeTag]
+        (c: Context)(cPickler: c.Tree): c.Tree = {
     import c.universe._
-    val t1tpe = weakTypeOf[T1]
-    val t2tpe = weakTypeOf[T2]
-    val t3tpe = weakTypeOf[T3]
+    val ttpe = weakTypeOf[T]
     val rtpe = weakTypeOf[R]
-    val picklerName = c.fresh(newTermName("Spore3Pickler"))
+    val utpe = weakTypeOf[U]
+
+    def isEffectivelyPrimitive(tpe: c.Type): Boolean = tpe match {
+      case TypeRef(_, sym: ClassSymbol, _) if sym.isPrimitive => true
+      case TypeRef(_, sym, eltpe :: Nil) if sym == definitions.ArrayClass && isEffectivelyPrimitive(eltpe) => true
+      case _ => false
+    }
+
+    val sporeTypeName = TypeName("SporeWithEnv")
+    val picklerName = c.freshName(TermName("SporePickler"))
+    val typeFieldName = """$type"""
 
     q"""
-      object $picklerName extends scala.pickling.Pickler[scala.spores.Spore3[$t1tpe, $t2tpe, $t3tpe, $rtpe]] {
+      val capturedPickler = $cPickler
+      object $picklerName extends scala.pickling.Pickler[scala.spores.SporeWithEnv[$ttpe, $rtpe] { type Captured = $utpe }] {
         def tag =
-          implicitly[scala.pickling.FastTypeTag[scala.spores.Spore3[$t1tpe, $t2tpe, $t3tpe, $rtpe]]]
+          implicitly[scala.pickling.FastTypeTag[scala.spores.SporeWithEnv[$ttpe, $rtpe] { type Captured = $utpe }]]
 
-        def pickle(picklee: scala.spores.Spore3[$t1tpe, $t2tpe, $t3tpe, $rtpe], builder: scala.pickling.PBuilder): Unit = {
+        def pickle(picklee: scala.spores.SporeWithEnv[$ttpe, $rtpe] { type Captured = $utpe }, builder: scala.pickling.PBuilder): Unit = {
+          // println("[genSporeCSPicklerImpl]")
           builder.beginEntry(picklee)
 
           builder.putField("className", b => {
             b.hintTag(scala.pickling.FastTypeTag.String)
             b.hintStaticallyElidedType()
             scala.pickling.pickler.AllPicklers.stringPickler.pickle(picklee.className, b)
+          })
+
+          builder.putField("captured", b => {
+            b.hintTag(capturedPickler.tag)
+            ${if (isEffectivelyPrimitive(utpe)) q"b.hintStaticallyElidedType()" else q""}
+            capturedPickler.pickle(picklee.asInstanceOf[$sporeTypeName[$ttpe, $rtpe]].captured.asInstanceOf[$utpe], b)
           })
 
           builder.endEntry()
@@ -208,7 +171,7 @@ object SporePickler {
   // TODO: probably need also implicit macro for Pickler[Spore[T, R] { type Captured = U }]
   // capture > 1 variables
   implicit def genSporeCMPickler[T, R, U <: Product](implicit cPickler: Pickler[U], cUnpickler: Unpickler[U])
-        : Pickler[SporeWithEnv[T, R] { type Captured = U }] = macro genSporeCMPicklerImpl[T, R, U]
+        : Pickler[SporeWithEnv[T, R] { type Captured = U }] with Unpickler[SporeWithEnv[T, R] { type Captured = U }] = macro genSporeCMPicklerImpl[T, R, U]
 
   def genSporeCMPicklerImpl[T: c.WeakTypeTag, R: c.WeakTypeTag, U: c.WeakTypeTag]
         (c: Context)(cPickler: c.Tree, cUnpickler: c.Tree): c.Tree = {
@@ -231,11 +194,11 @@ object SporePickler {
 
     val numVarsCaptured = utpe.typeArgs.size
     // println(s"numVarsCaptured = $numVarsCaptured")
-    val sporeTypeName = newTypeName("SporeWithEnv")
+    val sporeTypeName = TypeName("SporeWithEnv")
 
     debug(s"T: $ttpe, R: $rtpe, U: $utpe")
 
-    val picklerUnpicklerName = c.fresh(newTermName("SporePicklerUnpickler"))
+    val picklerUnpicklerName = c.freshName(TermName("SporePicklerUnpickler"))
     val typeFieldName = """$type"""
 
     q"""
@@ -326,7 +289,7 @@ object SporePickler {
 
     val numVarsCaptured = utpe.typeArgs.size
     // println(s"numVarsCaptured = $numVarsCaptured")
-    val picklerName = c.fresh(newTermName("Spore2CMPickler"))
+    val picklerName = c.freshName(TermName("Spore2CMPickler"))
     val typeFieldName = """$type"""
 
     q"""
@@ -385,7 +348,7 @@ object SporePickler {
 
     val numVarsCaptured = utpe.typeArgs.size
     // println(s"numVarsCaptured = $numVarsCaptured")
-    val picklerName = c.fresh(newTermName("Spore3CMPickler"))
+    val picklerName = c.freshName(TermName("Spore3CMPickler"))
     val typeFieldName = """$type"""
 
     // ${if (isEffectivelyPrimitive(utpe)) q"b.hintStaticallyElidedType()" else q""}
@@ -429,7 +392,7 @@ object SporePickler {
     val ttpe = weakTypeOf[T]
     val rtpe = weakTypeOf[R]
     debug(s"T: $ttpe, R: $rtpe")
-    val unpicklerName = c.fresh(newTermName("SporeUnpickler"))
+    val unpicklerName = c.freshName(TermName("SporeUnpickler"))
     val utils = new PicklerUtils[c.type](c)
     val reader = TermName("reader")
     val readClassName = utils.readClassNameTree(reader)
@@ -485,7 +448,7 @@ object SporePickler {
     val t2tpe = weakTypeOf[T2]
     val rtpe = weakTypeOf[R]
 
-    val unpicklerName = c.fresh(newTermName("Spore2CSUnpickler"))
+    val unpicklerName = c.freshName(TermName("Spore2CSUnpickler"))
     val utils = new PicklerUtils[c.type](c)
     val reader = TermName("reader")
     val readClassName = utils.readClassNameTree(reader)
@@ -553,7 +516,7 @@ object SporePickler {
 
     // debug(s"T: $ttpe, R: $rtpe")
 
-    val unpicklerName = c.fresh(newTermName("Spore2CMUnpickler"))
+    val unpicklerName = c.freshName(TermName("Spore2CMUnpickler"))
     // TODO: the below unpickling method does not correctly restore the spore's _className field
 
     q"""
@@ -612,7 +575,7 @@ object SporePickler {
 
     debug(s"T: $ttpe, R: $rtpe")
 
-    val unpicklerName = c.fresh(newTermName("SporeCMUnpickler"))
+    val unpicklerName = c.freshName(TermName("SporeCMUnpickler"))
 
     q"""
       object $unpicklerName extends scala.pickling.Unpickler[scala.spores.SporeWithEnv[$ttpe, $rtpe] { type Captured = $utpe }] {
@@ -668,7 +631,7 @@ object SporePickler {
     val t3tpe = weakTypeOf[T3]
     val rtpe = weakTypeOf[R]
 
-    val unpicklerName = c.fresh(newTermName("Spore3Unpickler"))
+    val unpicklerName = c.freshName(TermName("Spore3Unpickler"))
     val utils = new PicklerUtils[c.type](c)
     val reader = TermName("reader")
     val readClassName = utils.readClassNameTree(reader)
