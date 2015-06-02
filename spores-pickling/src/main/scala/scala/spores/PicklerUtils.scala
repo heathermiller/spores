@@ -8,14 +8,14 @@
 
 package scala.spores
 
-import scala.reflect.macros.Context
+import scala.reflect.macros.blackbox.Context
 
 
 private[spores] class PicklerUtils[C <: Context with Singleton](val c: C) {
   import c.universe._
 
   def readClassNameTree(reader: TermName): Tree = {
-    val result = c.fresh(TermName("result"))
+    val result = c.freshName(TermName("result"))
     q"""
       val reader2 = $reader.readField("className")
       reader2.hintTag(scala.pickling.FastTypeTag.String)
