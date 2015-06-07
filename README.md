@@ -21,12 +21,23 @@ To run the test suite:
 > test
 ```
 
-The `spores-pickling` module currently depends on the following snapshot
-version of pickling:
-```
-"org.scala-lang" %% "scala-pickling" % "0.9.1-SNAPSHOT"
+## Get Spores
+
+The `spores-core` and `spores-pickling` modules for Scala 2.11 are available
+on Maven Central and Sonatype. You can use Spores in your sbt project by
+simply adding the following dependency to your build file:
+
+```scala
+libraryDependencies += "org.scala-lang.modules" %% "spores-core" % "0.1.3"
 ```
 
+To enable integration with Pickling, add the following dependency:
+
+```scala
+libraryDependencies += "org.scala-lang.modules" %% "spores-pickling" % "0.1.3"
+```
+
+Or you can just directly download the jar files ([spores-core](http://search.maven.org/remotecontent?filepath=org/scala-lang/modules/spores-core_2.11/0.1.3/spores-core_2.11-0.1.3.jar), [spores-pickling](http://search.maven.org/remotecontent?filepath=org/scala-lang/modules/spores-pickling_2.11/0.1.3/spores-pickling_2.11-0.1.3.jar)).
 
 ## Updates since the first draft (June 16th, 2013) of SIP-21
 
