@@ -5,7 +5,6 @@ script:
 scala:
   - 2.11.6
 jdk:
-  - openjdk8
   - oraclejdk8
   - openjdk7
   - oraclejdk7
