@@ -35,24 +35,24 @@ package object spores {
 
   def spore[T1, T2, T3, R](fun: (T1, T2, T3) => R): Spore3[T1, T2, T3, R] = macro spore3Impl[T1, T2, T3, R]
 
+  def spore[R](fun: Function0[R]): NullarySpore[R] = macro nullarySporeImpl[R]
+
   implicit def mkSpore[T, R](fun: T => R): Spore[T, R] = macro sporeImpl[T, R]
 
-  def delayed[T](body: T): Function0[T] = macro delayedImpl[T]
-
-  def delayedImpl[T: c.WeakTypeTag](c: Context)(body: c.Expr[T]): c.Expr[Function0[T]] = {
-    import c.universe._
-    // check Spore constraints
-    //check(c)(fun.tree)
-
-    reify {
-      () => body.splice
-    }
+  def delayed[T](body: T): Function0[T] = new Function0[T] {
+    def apply(): T = body
   }
 
   // TOGGLE DEBUGGING
   private val isDebugEnabled = System.getProperty("spores.debug", "false").toBoolean
   private[spores] def debug(s: => String): Unit =
     if (isDebugEnabled) println(s)
+
+  def nullarySporeImpl[R: c.WeakTypeTag](c: Context)(fun: c.Expr[Function0[R]]): c.Expr[NullarySpore[R]] = {
+    val impl = new MacroImpl[c.type](c)
+    val tree = impl.checkNullary(fun.tree, c.universe.weakTypeOf[R])
+    c.Expr[NullarySpore[R]](tree)
+  }
 
   def sporeImpl[T: c.WeakTypeTag, R: c.WeakTypeTag](c: Context)(fun: c.Expr[T => R]): c.Expr[Spore[T, R]] = {
     import c.universe._
