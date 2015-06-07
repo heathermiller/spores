@@ -8,8 +8,34 @@
 
 package scala.spores
 
-// TODO: complete implementation
-trait NullarySpore[+R] extends Function0[R]
+trait NullarySpore[+R] extends Function0[R] {
+
+  /** The type of captured variables.
+   *
+   *  If this Spore captures multiple variables, this is
+   *  a tuple type.
+   */
+  type Captured
+
+  /** Enables creating an instance of a Spore subclass via reflection.
+   */
+  def className: String =
+    _className
+
+  protected[this] var _className: String =
+    null
+}
+
+trait NullarySporeWithEnv[+R] extends NullarySpore[R] {
+
+  /** Stores the environment of the Spore.
+   *
+   *  If the Spore captures multiple variables, this field
+   *  stores a tuple.
+   */
+  var captured: Captured = _
+
+}
 
 trait Spore[-T, +R] extends Function1[T, R] {
 
