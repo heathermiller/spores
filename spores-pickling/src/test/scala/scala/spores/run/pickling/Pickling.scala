@@ -158,6 +158,30 @@ class PicklingSpec {
     assert(res2 == "arg1: 5, arg2: hi, arg3: -")
   }
 
+  @Test
+  def `simple pickling of nullary spore`(): Unit = {
+    val s = spore { delayed { List(2, 3, 4) } }
+    val res  = s.pickle
+    val up   = res.unpickle[NullarySpore[List[Int]]]
+    val res2 = up()
+    assert(res2.toString == "List(2, 3, 4)")
+  }
+
+  @Test
+  def `simple pickling of nullary spore with one captured variable`(): Unit = {
+    val x = 1
+    val s = spore {
+      val localX = x
+      delayed {
+        List(1, 2, 3).map(_ + localX)
+      }
+    }
+    val res  = s.pickle
+    val up   = res.unpickle[NullarySpore[List[Int]]]
+    val res2 = up()
+    assert(res2.toString == "List(2, 3, 4)")
+  }
+
   def doPickle[T <: Spore[Int, String]: Pickler: Unpickler](spor: T) = {
     val unpickler = implicitly[Unpickler[T]]
     val res       = spor.pickle
