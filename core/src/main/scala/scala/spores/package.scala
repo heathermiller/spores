@@ -97,13 +97,13 @@ package object spores {
             case vd @ ValDef(mods, name, tpt, rhs) =>
               List(vd.symbol -> tpt.tpe)
             case td @ TypeDef(mods, name, tparams, rhs) =>
-              println(s"found type def $name with rhs: $rhs")
+              debug(s"found type def $name with rhs: $rhs")
               if (name.toString == "Constraint") {
                 rhs match {
                   case tpt @ TypeTree() =>
-                    println(s"found TypeTree, tpe: ${tpt.tpe}")
+                    debug(s"found TypeTree, tpe: ${tpt.tpe}")
                   case _ =>
-                    println(s"rhs is something else: ${rhs.getClass}")
+                    debug(s"rhs is something else: ${rhs.getClass}")
                 }
               }
               List()
@@ -170,7 +170,7 @@ package object spores {
 
     // check Spore constraints
     val tpes = checkTc(c)(fun.tree)
-    println("captured types: " + tpes)
+    debug("captured types: " + tpes)
 
     reify {
       val f = fun.splice
