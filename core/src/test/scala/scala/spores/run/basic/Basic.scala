@@ -144,39 +144,7 @@ class BasicSpec {
   }
 
 
-  /**
-    * same as nestedPTTCapture, but (_: Unit) => ... replaced with Nullary spore
-    */
-//  @Test
-//  def nestedPTTCaptureNullary(): Unit = {
-//
-//    abstract class A {
-//      self =>
-//      type B
-//      val t: self.B
-//      def f(x: self.B) = {}
-//    }
-//
-//    val s = spore{
-//      val y = 5
-//      delayed {
-//        spore {
-//          val y = 5
-//          (a: A) => {
-//            val k: a.B = a.t
-//            a.f(k)
-//          }
-//        }
-//        println()
-//      }
-//    }
-//  }
 
-
-
-  /**
-    * Should be the same that SporeAvoided and Spore expands to in Ownership.scala.
-    */
   @Test
   def sporeWithAnonClasses(): Unit = {
 

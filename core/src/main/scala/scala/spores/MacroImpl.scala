@@ -403,9 +403,15 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
     }
   }
 
-  /* Constructs a function that replaces all occurrences of symbols in m with trees in m and that changes the 'origin'
-   * field to fix path-dependent types.
-   */
+  /**  Constructs a function that replaces all occurrences of symbols in m with trees in m and that changes the 'origin'
+    *  field to fix path-dependent types.
+    *  In some cases, PTT:s that start with captured variables or the spore parameters are not traversed fully.
+    *  The syntax tree part of these PTTs shows as "TypeTree()", but the ().tpe part has additional structure.
+    *  The 'TypeTree' case transforms these types by adding an "().original" field, that is a syntax tree.
+    *  The syntax tree is constructed by replacing all TypeName(s) occurances where s is the name of a captured
+    *  variable or a parameter into nameMap(s). E.g. 
+    *  TypeRef(SingleType(SingleType(NoPrefix, TermName("param")), TypeName("R") --> Select(nameMap("param"), TypeName("R"))
+    */
   def transformTypes(m: Map[c.universe.Symbol, Tree], nameMap: Map[String, Tree]) : Tree => Tree = {
 
     // recycled from TreeSubstituter in Trees.scala and
@@ -417,9 +423,7 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
       override def transform(tree: Tree): Tree = {
 
         tree match {
-          case ident@Ident(_) =>
-            if (m.contains(tree.symbol)) m(tree.symbol)
-            else tree
+          case Ident(_) => m.getOrElse(tree.symbol, tree)
           case tt: TypeTree if tt.original != null =>
             super.transform(c.universe.internal.setOriginal(TypeTree(), super.transform(tt.original)))
           case tt: TypeTree if tt.original == null =>
@@ -590,18 +594,18 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
         val superclassName = TypeName("SporeWithEnv")
 
         val capturedTypeDefinition = (if (capturedTypes.size == 1) q"type Captured = ${capturedTypes(0)}"
-        else if (capturedTypes.size == 2) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)})"
-        else if (capturedTypes.size == 3) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)})"
-        else if (capturedTypes.size == 4) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)})"
-        else if (capturedTypes.size == 5) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)}, ${capturedTypes(4)})"
-        else if (capturedTypes.size == 6) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)}, ${capturedTypes(4)}, ${capturedTypes(5)})"
-        else if (capturedTypes.size == 7) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)}, ${capturedTypes(4)}, ${capturedTypes(5)}, ${capturedTypes(6)})"
-        else if (capturedTypes.size == 8) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)}, ${capturedTypes(4)}, ${capturedTypes(5)}, ${capturedTypes(6)}, ${capturedTypes(7)})").asInstanceOf[c.Tree]
+          else if (capturedTypes.size == 2) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)})"
+          else if (capturedTypes.size == 3) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)})"
+          else if (capturedTypes.size == 4) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)})"
+          else if (capturedTypes.size == 5) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)}, ${capturedTypes(4)})"
+          else if (capturedTypes.size == 6) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)}, ${capturedTypes(4)}, ${capturedTypes(5)})"
+          else if (capturedTypes.size == 7) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)}, ${capturedTypes(4)}, ${capturedTypes(5)}, ${capturedTypes(6)})"
+          else if (capturedTypes.size == 8) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)}, ${capturedTypes(4)}, ${capturedTypes(5)}, ${capturedTypes(6)}, ${capturedTypes(7)})").asInstanceOf[c.Tree]
 
         val q"type $_ = $capturedTypeTree" = capturedTypeDefinition
         
         q"""
-          class $sporeClassName(val captured : $capturedTypeTree) extends $superclassName[$ttpe, $rtpe] {
+          final class $sporeClassName(val captured : $capturedTypeTree) extends $superclassName[$ttpe, $rtpe] {
             $capturedTypeDefinition
             this._className = this.getClass.getName
             $applyDefDef
