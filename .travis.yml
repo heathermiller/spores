@@ -3,10 +3,9 @@ script:
   - sbt ++$TRAVIS_SCALA_VERSION 'project spores-core' clean test
   - sbt ++$TRAVIS_SCALA_VERSION 'project spores-pickling' clean test
 scala:
-  - 2.11.6
+  - 2.11.7
 jdk:
   - oraclejdk8
-  - openjdk7
   - oraclejdk7
 notifications:
   email:
