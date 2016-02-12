@@ -33,7 +33,7 @@ trait NullarySporeWithEnv[+R] extends NullarySpore[R] {
    *  If the Spore captures multiple variables, this field
    *  stores a tuple.
    */
-  var captured: Captured = _
+  val captured: Captured //= _
 
 }
 
@@ -62,7 +62,7 @@ trait SporeWithEnv[-T, +R] extends Spore[T, R] {
    *  If the Spore captures multiple variables, this field
    *  stores a tuple.
    */
-  var captured: Captured = _
+  val captured: Captured // = _
 
 }
 
@@ -91,7 +91,7 @@ trait Spore2WithEnv[-T1, -T2, +R] extends Spore2[T1, T2, R] {
    *  If the Spore captures multiple variables, this field
    *  stores a tuple.
    */
-  var captured: Captured = _
+  val captured: Captured // = _
 
 }
 
@@ -120,7 +120,7 @@ trait Spore3WithEnv[-T1, -T2, -T3, +R] extends Spore3[T1, T2, T3, R] {
    *  If the Spore captures multiple variables, this field
    *  stores a tuple.
    */
-  var captured: Captured = _
+  val captured: Captured // = _
 
 }
 
