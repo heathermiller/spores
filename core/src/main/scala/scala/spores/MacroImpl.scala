@@ -248,6 +248,7 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
       if (paramSyms.size == 2) {
         q"""
           class $sporeClassName extends scala.spores.Spore2[${tpes(1)}, ${tpes(2)}, ${tpes(0)}] {
+            self =>
             this._className = this.getClass.getName
             $applyDefDef
           }
@@ -256,6 +257,7 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
       } else if (paramSyms.size == 3) {
         q"""
           class $sporeClassName extends scala.spores.Spore3[${tpes(1)}, ${tpes(2)}, ${tpes(3)}, ${tpes(0)}] {
+            self =>
             this._className = this.getClass.getName
             $applyDefDef
           }
@@ -269,8 +271,11 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
         debug(s"capturedTypes: ${capturedTypes.mkString(",")}")
 
         val symsToReplace     = paramSyms ::: validEnv
-        val newTrees          = (1 to validEnv.size).map(i => Select(Ident(TermName("captured")), TermName(s"_$i"))).toList
-        val treesToSubstitute = ids ::: newTrees
+        val newTrees          = //(1 to validEnv.size).map(i => Select(Ident(TermName("captured")), TermName(s"_$i"))).toList
+          if (validEnv.size == 1) List(Select(Ident(TermName("self")), TermName("captured")))
+          else (1 to validEnv.size).map(i => Select(Select(Ident(TermName("self")), TermName("captured")), TermName(s"_$i"))).toList
+
+      val treesToSubstitute = ids ::: newTrees
         val m = symsToReplace.zip(treesToSubstitute).toMap
         val applyDefDef       = processFunctionBody(m, funBody)
 
@@ -286,7 +291,8 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
 
         val constructorParams = List(List(toTuple(rhss)))
 
-        val captureTypeTreeDefinition = (if (capturedTypes.size == 2) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)})"
+        val captureTypeTreeDefinition = (if (capturedTypes.size == 1) q"type Captured = ${capturedTypes(0)}"
+          else if (capturedTypes.size == 2) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)})"
           else if (capturedTypes.size == 3) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)})"
           else if (capturedTypes.size == 4) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)})"
           else if (capturedTypes.size == 5) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)}, ${capturedTypes(4)})"
@@ -299,7 +305,8 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
 
       if (paramSyms.size == 2) {
           q"""
-            final class $sporeClassName(val captured: $captureTypeTree) extends scala.spores.Spore2WithEnv[${tpes(1)}, ${tpes(2)}, ${tpes(0)}] {
+            class $sporeClassName(val captured: $captureTypeTree) extends scala.spores.Spore2WithEnv[${tpes(1)}, ${tpes(2)}, ${tpes(0)}] {
+              self =>
               $captureTypeTreeDefinition
               this._className = this.getClass.getName
               $applyDefDef
@@ -308,7 +315,8 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
           """
         } else if (paramSyms.size == 3) {
           q"""
-            final class $sporeClassName(val captured: $captureTypeTree) extends scala.spores.Spore3WithEnv[${tpes(1)}, ${tpes(2)}, ${tpes(3)}, ${tpes(0)}] {
+            class $sporeClassName(val captured: $captureTypeTree) extends scala.spores.Spore3WithEnv[${tpes(1)}, ${tpes(2)}, ${tpes(3)}, ${tpes(0)}] {
+              self =>
               $captureTypeTreeDefinition
               this._className = this.getClass.getName
               $applyDefDef
@@ -352,8 +360,8 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
       // replace references to captured variables with references to new fields
       val symsToReplace = validEnv
       val newTrees =
-        if (validEnv.size == 1) List(Ident(TermName("captured")))
-        else (1 to validEnv.size).map(i => Select(Ident( TermName("captured")), TermName(s"_$i"))).toList
+        if (validEnv.size == 1) List(Select(Ident(TermName("self")), TermName("captured")))
+        else (1 to validEnv.size).map(i => Select(Select(Ident(TermName("self")), TermName("captured")), TermName(s"_$i"))).toList
       val treesToSubstitute = newTrees
       val symsToTrees = symsToReplace.zip(treesToSubstitute).toMap
       val newFunBody = transformTypes(symsToTrees ) (funBody)
@@ -390,7 +398,8 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
       val q"type $_ = $captureTypeTree" = captureTypeTreeDefinition
 
       q"""
-        final class $sporeClassName(val captured: $captureTypeTree) extends $superclassName[$rtpe] {
+        class $sporeClassName(val captured: $captureTypeTree) extends $superclassName[$rtpe] {
+          self =>
           $captureTypeTreeDefinition
           this._className = this.getClass.getName
           $applyDefDef
@@ -543,6 +552,7 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
 
         q"""
           class $sporeClassName extends scala.spores.Spore[$ttpe, $rtpe] {
+            self =>
             this._className = this.getClass.getName
             $applyDefDef
           }
@@ -556,8 +566,8 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
 
         val symsToReplace = paramSym :: validEnv
         val newTrees =
-          if (validEnv.size == 1) List(Ident(TermName("captured")))
-          else (1 to validEnv.size).map(i => Select(Ident(TermName("captured")), TermName(s"_$i"))).toList
+          if (validEnv.size == 1) List(Select(Ident(TermName("self")), TermName("captured")))
+          else (1 to validEnv.size).map(i => Select(Select(Ident(TermName("self")), TermName("captured")), TermName(s"_$i"))).toList
 
         val treesToSubstitute = id :: newTrees
         val symsToTrees = symsToReplace.zip(treesToSubstitute).toMap
@@ -599,7 +609,8 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
         val q"type $_ = $capturedTypeTree" = capturedTypeDefinition
         
         q"""
-          final class $sporeClassName(val captured : $capturedTypeTree) extends $superclassName[$ttpe, $rtpe] {
+          class $sporeClassName(val captured : $capturedTypeTree) extends $superclassName[$ttpe, $rtpe] {
+            self =>
             $capturedTypeDefinition
             this._className = this.getClass.getName
             $applyDefDef
