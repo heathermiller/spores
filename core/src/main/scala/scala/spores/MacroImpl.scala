@@ -271,11 +271,11 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
         debug(s"capturedTypes: ${capturedTypes.mkString(",")}")
 
         val symsToReplace     = paramSyms ::: validEnv
-        val newTrees          = //(1 to validEnv.size).map(i => Select(Ident(TermName("captured")), TermName(s"_$i"))).toList
+        val newTrees          =
           if (validEnv.size == 1) List(Select(Ident(TermName("self")), TermName("captured")))
           else (1 to validEnv.size).map(i => Select(Select(Ident(TermName("self")), TermName("captured")), TermName(s"_$i"))).toList
 
-      val treesToSubstitute = ids ::: newTrees
+        val treesToSubstitute = ids ::: newTrees
         val m = symsToReplace.zip(treesToSubstitute).toMap
         val applyDefDef       = processFunctionBody(m, funBody)
 
