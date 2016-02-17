@@ -92,27 +92,21 @@ object SporeConvImpl {
 
   def convImplNullary[R: c.WeakTypeTag, A: c.WeakTypeTag] (c : Context) (s: c.Expr[NullarySpore[R]]) :
   c.Expr[NullarySpore[R] {type Excluded = A}] = {
-    c.Expr[NullarySpore[R] {type Excluded = A}] (constructTree[A](c)(s.tree).asInstanceOf[c.universe.Tree])
+    c.Expr[NullarySpore[R] {type Excluded = A}] (constructTree[A](c)(s.tree))
   }
 
   def convImplSpore[T: c.WeakTypeTag, R: c.WeakTypeTag, A: c.WeakTypeTag] (c : Context) (s: c.Expr[Spore[T, R]]) :
       c.Expr[Spore[T, R] {type Excluded = A}] = {
-
-    val new_tree = constructTree[A](c)(s.tree)
-    c.Expr[Spore[T, R] {type Excluded = A}](new_tree.asInstanceOf[c.universe.Tree])
+    c.Expr[Spore[T, R] {type Excluded = A}](constructTree[A](c)(s.tree))
   }
 
   def convImplSpore2[T1: c.WeakTypeTag, T2: c.WeakTypeTag, R: c.WeakTypeTag, A: c.WeakTypeTag] (c : Context) (s: c.Expr[Spore2[T1, T2, R]]) :
   c.Expr[Spore2[T1, T2, R] {type Excluded = A}] = {
-
-    val new_tree = constructTree[A](c)(s.tree)
-    c.Expr[Spore2[T1, T2, R] {type Excluded = A}](new_tree.asInstanceOf[c.universe.Tree])
+    c.Expr[Spore2[T1, T2, R] {type Excluded = A}](constructTree[A](c)(s.tree))
   }
 
   def convImplSpore3[T1: c.WeakTypeTag, T2: c.WeakTypeTag, T3: c.WeakTypeTag, R: c.WeakTypeTag, A: c.WeakTypeTag] (c : Context) (s: c.Expr[Spore3[T1, T2, T3, R]]) :
   c.Expr[Spore3[T1, T2, T3, R] {type Excluded = A}] = {
-
-    val new_tree = constructTree[A](c)(s.tree)
-    c.Expr[Spore3[T1, T2, T3, R] {type Excluded = A}](new_tree.asInstanceOf[c.universe.Tree])
+    c.Expr[Spore3[T1, T2, T3, R] {type Excluded = A}](constructTree[A](c)(s.tree))
   }
 }
