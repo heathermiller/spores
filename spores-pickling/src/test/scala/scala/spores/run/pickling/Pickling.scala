@@ -6,11 +6,50 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
 
+import scala.concurrent.Future
+
 import scala.pickling._
-import Defaults._
-import json._
+import scala.pickling.Defaults._
+import scala.pickling.json._
 
 import SporePickler._
+
+
+class LocalSilo[U, T <: Traversable[U]](val value: T) {
+  def send(): Future[T] =
+    Future.successful(value)
+}
+
+case class InitSiloFun[U, T <: Traversable[U]](fun: NullarySpore[LocalSilo[U, T]], refId: Int)
+
+
+object GlobalFuns {
+  private val summary = """
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
+incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis
+nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore
+eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt
+in culpa qui officia deserunt mollit anim id est laborum."""
+
+  private lazy val words = summary.replace('\n', ' ').split(" ")
+
+  def randomWord(random: scala.util.Random): String = {
+    val index = random.nextInt(words.length)
+    words(index)
+  }
+
+  def populateSilo(numLines: Int, random: scala.util.Random): LocalSilo[String, List[String]] = {
+    // each string is a concatenation of 10 random words, separated by space
+    val buffer = collection.mutable.ListBuffer[String]()
+    val lines = for (i <- 0 until numLines) yield {
+      val tenWords = for (_ <- 1 to 10) yield randomWord(random)
+      buffer += tenWords.mkString(" ")
+    }
+    new LocalSilo(buffer.toList)
+  }
+}
+
 
 @RunWith(classOf[JUnit4])
 class PicklingSpec {
@@ -158,6 +197,30 @@ class PicklingSpec {
     assert(res2 == "arg1: 5, arg2: hi, arg3: -")
   }
 
+  @Test
+  def `simple pickling of nullary spore`(): Unit = {
+    val s = spore { delayed { List(2, 3, 4) } }
+    val res  = s.pickle
+    val up   = res.unpickle[NullarySpore[List[Int]]]
+    val res2 = up()
+    assert(res2.toString == "List(2, 3, 4)")
+  }
+
+  @Test
+  def `simple pickling of nullary spore with one captured variable`(): Unit = {
+    val x = 1
+    val s = spore {
+      val localX = x
+      delayed {
+        List(1, 2, 3).map(_ + localX)
+      }
+    }
+    val res  = s.pickle
+    val up   = res.unpickle[NullarySpore[List[Int]]]
+    val res2 = up()
+    assert(res2.toString == "List(2, 3, 4)")
+  }
+
   def doPickle[T <: Spore[Int, String]: Pickler: Unpickler](spor: T) = {
     val unpickler = implicitly[Unpickler[T]]
     val res       = spor.pickle
@@ -177,5 +240,20 @@ class PicklingSpec {
       (x: Int) => s"arg: $x, c1: $c1, c2: $c2"
     }
     doPickle(s)
+  }
+
+  @Test
+  def `pickle case class with nullary spore`(): Unit = {
+    val s: NullarySpore[LocalSilo[String, List[String]]] = spore {
+      delayed {
+        GlobalFuns.populateSilo(10, new scala.util.Random(100))
+      }
+    }
+
+    val init = InitSiloFun(s, 5)
+    val p = init.pickle
+    val up = p.unpickle[InitSiloFun[String, List[String]]]
+    assert(up.refId == 5)
+    assert(up.fun().value.size == 10)
   }
 }

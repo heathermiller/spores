@@ -14,7 +14,7 @@ import scala.reflect.macros.blackbox.Context
 import scala.pickling._
 
 
-object SporePickler extends SimpleSporePicklerImpl {
+object SporePickler extends SimpleSporePicklerImpl with NullarySporePicklerImpl {
   /*implicit*/
   def genSporePickler[T, R, U](implicit cPickler: Pickler[U], cUnpickler: Unpickler[U])
         : Pickler[Spore[T, R] { type Captured = U }] with Unpickler[Spore[T, R] { type Captured = U }] = macro genSporePicklerImpl[T, R, U]
@@ -120,6 +120,12 @@ object SporePickler extends SimpleSporePicklerImpl {
 
   implicit def genSimpleSpore3Pickler[T1, T2, T3, R]: Pickler[Spore3[T1, T2, T3, R]] =
     macro genSimpleSpore3PicklerImpl[T1, T2, T3, R]
+
+  implicit def genNullarySporePickler[R]: Pickler[NullarySpore[R]] =
+    macro genNullarySporePicklerImpl[R]
+
+  implicit def genNullarySporeCSPickler[R, U](implicit cPickler: Pickler[U]): Pickler[NullarySporeWithEnv[R] { type Captured = U }] =
+    macro genNullarySporeCSPicklerImpl[R, U]
 
   // type `U` </: `Product`
   implicit def genSporeCSPickler[T, R, U](implicit cPickler: Pickler[U]): Pickler[SporeWithEnv[T, R] { type Captured = U }] =
@@ -389,6 +395,9 @@ object SporePickler extends SimpleSporePicklerImpl {
     """
   }
 
+
+  implicit def genNullarySporeCSUnpickler[R]: Unpickler[NullarySpore[R]] =
+    macro genNullarySporeCSUnpicklerImpl[R]
 
   implicit def genSporeCSUnpickler[T, R]: Unpickler[Spore[T, R]/* { type Captured }*/] =
     macro genSporeCSUnpicklerImpl[T, R]
