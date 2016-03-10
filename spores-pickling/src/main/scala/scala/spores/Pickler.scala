@@ -14,11 +14,7 @@ import scala.reflect.macros.blackbox.Context
 import scala.pickling._
 
 
-object SporePickler extends SimpleSporePicklerImpl {
-  /*implicit*/
-  def genSporePickler[T, R, U](implicit cPickler: Pickler[U], cUnpickler: Unpickler[U])
-        : Pickler[Spore[T, R] { type Captured = U }] with Unpickler[Spore[T, R] { type Captured = U }] = macro genSporePicklerImpl[T, R, U]
-
+trait SporePickler extends SimpleSporePicklerImpl {
   def genSporePicklerImpl[T: c.WeakTypeTag, R: c.WeakTypeTag, U: c.WeakTypeTag]
         (c: Context)(cPickler: c.Tree, cUnpickler: c.Tree): c.Tree = {
 
@@ -112,19 +108,6 @@ object SporePickler extends SimpleSporePicklerImpl {
     """
   }
 
-  implicit def genSimpleSporePickler[T, R]: Pickler[Spore[T, R]] =
-    macro genSimpleSporePicklerImpl[T, R]
-
-  implicit def genSimpleSpore2Pickler[T1, T2, R]: Pickler[Spore2[T1, T2, R]] =
-    macro genSimpleSpore2PicklerImpl[T1, T2, R]
-
-  implicit def genSimpleSpore3Pickler[T1, T2, T3, R]: Pickler[Spore3[T1, T2, T3, R]] =
-    macro genSimpleSpore3PicklerImpl[T1, T2, T3, R]
-
-  // type `U` </: `Product`
-  implicit def genSporeCSPickler[T, R, U](implicit cPickler: Pickler[U]): Pickler[SporeWithEnv[T, R] { type Captured = U }] =
-    macro genSporeCSPicklerImpl[T, R, U]
-
   def genSporeCSPicklerImpl[T: c.WeakTypeTag, R: c.WeakTypeTag, U: c.WeakTypeTag]
         (c: Context)(cPickler: c.Tree): c.Tree = {
     import c.universe._
@@ -170,11 +153,6 @@ object SporePickler extends SimpleSporePicklerImpl {
       $picklerName
     """
   }
-
-  // TODO: probably need also implicit macro for Pickler[Spore[T, R] { type Captured = U }]
-  // capture > 1 variables
-  implicit def genSporeCMPickler[T, R, U <: Product](implicit cPickler: Pickler[U], cUnpickler: Unpickler[U])
-        : Pickler[SporeWithEnv[T, R] { type Captured = U }] with Unpickler[SporeWithEnv[T, R] { type Captured = U }] = macro genSporeCMPicklerImpl[T, R, U]
 
   def genSporeCMPicklerImpl[T: c.WeakTypeTag, R: c.WeakTypeTag, U: c.WeakTypeTag]
         (c: Context)(cPickler: c.Tree, cUnpickler: c.Tree): c.Tree = {
@@ -271,10 +249,6 @@ object SporePickler extends SimpleSporePicklerImpl {
     """
   }
 
-  // capture > 1 variables
-  implicit def genSpore2CMPickler[T1, T2, R, U <: Product](implicit cPickler: Pickler[U], cUnpickler: Unpickler[U])
-        : Pickler[Spore2WithEnv[T1, T2, R] { type Captured = U }] = macro genSpore2CMPicklerImpl[T1, T2, R, U]
-
   def genSpore2CMPicklerImpl[T1: c.WeakTypeTag, T2: c.WeakTypeTag, R: c.WeakTypeTag, U: c.WeakTypeTag]
         (c: Context)(cPickler: c.Tree, cUnpickler: c.Tree): c.Tree = {
     import c.universe._
@@ -328,10 +302,6 @@ object SporePickler extends SimpleSporePicklerImpl {
       $picklerName
     """
   }
-
-  // capture > 1 variables
-  implicit def genSpore3CMPickler[T1, T2, T3, R, U <: Product](implicit cPickler: Pickler[U], cUnpickler: Unpickler[U])
-        : Pickler[Spore3WithEnv[T1, T2, T3, R] { type Captured = U }] = macro genSpore3CMPicklerImpl[T1, T2, T3, R, U]
 
   def genSpore3CMPicklerImpl[T1: c.WeakTypeTag, T2: c.WeakTypeTag, T3: c.WeakTypeTag, R: c.WeakTypeTag, U: c.WeakTypeTag]
         (c: Context)(cPickler: c.Tree, cUnpickler: c.Tree): c.Tree = {
@@ -390,9 +360,6 @@ object SporePickler extends SimpleSporePicklerImpl {
   }
 
 
-  implicit def genSporeCSUnpickler[T, R]: Unpickler[Spore[T, R]/* { type Captured }*/] =
-    macro genSporeCSUnpicklerImpl[T, R]
-
   def genSporeCSUnpicklerImpl[T: c.WeakTypeTag, R: c.WeakTypeTag](c: Context): c.Tree = {
     import c.universe._
     val ttpe = weakTypeOf[T]
@@ -446,9 +413,6 @@ object SporePickler extends SimpleSporePicklerImpl {
       $unpicklerName
     """
   }
-
-  implicit def genSpore2CSUnpickler[T1, T2, R]: Unpickler[Spore2[T1, T2, R]] =
-    macro genSpore2CSUnpicklerImpl[T1, T2, R]
 
   def genSpore2CSUnpicklerImpl[T1: c.WeakTypeTag, T2: c.WeakTypeTag, R: c.WeakTypeTag](c: Context): c.Tree = {
     import c.universe._
@@ -505,9 +469,6 @@ object SporePickler extends SimpleSporePicklerImpl {
       $unpicklerName
     """
   }
-
-  implicit def genSpore2CMUnpickler[T1, T2, R, U]: Unpickler[Spore2WithEnv[T1, T2, R] { type Captured = U }] =
-    macro genSpore2CMUnpicklerImpl[T1, T2, R, U]
 
   def genSpore2CMUnpicklerImpl[T1: c.WeakTypeTag, T2: c.WeakTypeTag, R: c.WeakTypeTag, U: c.WeakTypeTag](c: Context): c.Tree = {
     import c.universe._
@@ -568,9 +529,6 @@ object SporePickler extends SimpleSporePicklerImpl {
       $unpicklerName
     """
   }
-
-  implicit def genSporeCMUnpickler[T, R, U]: Unpickler[SporeWithEnv[T, R] { type Captured = U }] =
-    macro genSporeCMUnpicklerImpl[T, R, U]
 
   def genSporeCMUnpicklerImpl[T: c.WeakTypeTag, R: c.WeakTypeTag, U: c.WeakTypeTag](c: Context): c.Tree = {
     import c.universe._
@@ -637,9 +595,6 @@ object SporePickler extends SimpleSporePicklerImpl {
     """
   }
 
-  implicit def genSpore3CSUnpickler[T1, T2, T3, R]: Unpickler[Spore3[T1, T2, T3, R]] =
-    macro genSpore3CSUnpicklerImpl[T1, T2, T3, R]
-
   def genSpore3CSUnpicklerImpl[T1: c.WeakTypeTag, T2: c.WeakTypeTag, T3: c.WeakTypeTag, R: c.WeakTypeTag](c: Context): c.Tree = {
     import c.universe._
     val t1tpe = weakTypeOf[T1]
@@ -696,4 +651,51 @@ object SporePickler extends SimpleSporePicklerImpl {
       $unpicklerName
     """
   }
+}
+
+object SporePickler extends SporePickler {
+  /*implicit*/
+  def genSporePickler[T, R, U](implicit cPickler: Pickler[U], cUnpickler: Unpickler[U])
+    : Pickler[Spore[T, R] { type Captured = U }] with Unpickler[Spore[T, R] { type Captured = U }] = macro genSporePicklerImpl[T, R, U]
+
+  implicit def genSimpleSporePickler[T, R]: Pickler[Spore[T, R]] =
+    macro genSimpleSporePicklerImpl[T, R]
+
+  implicit def genSimpleSpore2Pickler[T1, T2, R]: Pickler[Spore2[T1, T2, R]] =
+    macro genSimpleSpore2PicklerImpl[T1, T2, R]
+
+  implicit def genSimpleSpore3Pickler[T1, T2, T3, R]: Pickler[Spore3[T1, T2, T3, R]] =
+    macro genSimpleSpore3PicklerImpl[T1, T2, T3, R]
+
+  // type `U` </: `Product`
+  implicit def genSporeCSPickler[T, R, U](implicit cPickler: Pickler[U]): Pickler[SporeWithEnv[T, R] { type Captured = U }] =
+    macro genSporeCSPicklerImpl[T, R, U]
+
+  // TODO: probably need also implicit macro for Pickler[Spore[T, R] { type Captured = U }]
+  // capture > 1 variables
+  implicit def genSporeCMPickler[T, R, U <: Product](implicit cPickler: Pickler[U], cUnpickler: Unpickler[U])
+    : Pickler[SporeWithEnv[T, R] { type Captured = U }] with Unpickler[SporeWithEnv[T, R] { type Captured = U }] = macro genSporeCMPicklerImpl[T, R, U]
+
+  // capture > 1 variables
+  implicit def genSpore2CMPickler[T1, T2, R, U <: Product](implicit cPickler: Pickler[U], cUnpickler: Unpickler[U])
+    : Pickler[Spore2WithEnv[T1, T2, R] { type Captured = U }] = macro genSpore2CMPicklerImpl[T1, T2, R, U]
+
+  // capture > 1 variables
+  implicit def genSpore3CMPickler[T1, T2, T3, R, U <: Product](implicit cPickler: Pickler[U], cUnpickler: Unpickler[U])
+    : Pickler[Spore3WithEnv[T1, T2, T3, R] { type Captured = U }] = macro genSpore3CMPicklerImpl[T1, T2, T3, R, U]
+
+  implicit def genSporeCSUnpickler[T, R]: Unpickler[Spore[T, R]/* { type Captured }*/] =
+    macro genSporeCSUnpicklerImpl[T, R]
+
+  implicit def genSpore2CSUnpickler[T1, T2, R]: Unpickler[Spore2[T1, T2, R]] =
+    macro genSpore2CSUnpicklerImpl[T1, T2, R]
+
+  implicit def genSpore2CMUnpickler[T1, T2, R, U]: Unpickler[Spore2WithEnv[T1, T2, R] { type Captured = U }] =
+    macro genSpore2CMUnpicklerImpl[T1, T2, R, U]
+
+  implicit def genSporeCMUnpickler[T, R, U]: Unpickler[SporeWithEnv[T, R] { type Captured = U }] =
+    macro genSporeCMUnpicklerImpl[T, R, U]
+
+  implicit def genSpore3CSUnpickler[T1, T2, T3, R]: Unpickler[Spore3[T1, T2, T3, R]] =
+    macro genSpore3CSUnpicklerImpl[T1, T2, T3, R]
 }
