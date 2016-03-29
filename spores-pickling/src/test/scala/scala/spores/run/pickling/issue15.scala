@@ -23,8 +23,7 @@ class Issue15Spec {
 
     val d = s.pickle
     assert(d.value.toString.endsWith("""
-      |    "value": "hello"
-      |  }
+      |  "captured": "hello"
       |}""".stripMargin))
 
     val us = d.unpickle[Spore[List[Int], List[String]]]

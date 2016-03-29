@@ -27,7 +27,8 @@ final case class SelfDescribing(unpicklerClassName: String, blob: Array[Byte]) {
     }
 
     val typeString = reader.beginEntry()
-    reader.hintTag(unpicklerInst.tag)
+    reader.hintElidedType(unpicklerInst.tag)
+    reader.endEntry()
     unpicklerInst.unpickle(unpicklerInst.tag.key, reader)
   }
 }
@@ -39,7 +40,7 @@ class SelfDescribingSpec {
   def mkSelfDesc[T, S](fun: T => S)(implicit pickler: Pickler[Spore[T, S]], unpickler: Unpickler[Spore[T, S]]): SelfDescribing = {
     // pickle spore
     val newBuilder = binary.pickleFormat.createBuilder()
-    newBuilder.hintTag(pickler.tag)
+    newBuilder.hintElidedType(pickler.tag)
     pickler.asInstanceOf[Pickler[Any]].pickle(fun, newBuilder)
     val p = newBuilder.result()
     SelfDescribing(unpickler.getClass.getName, p.value)
@@ -48,7 +49,7 @@ class SelfDescribingSpec {
   def mkSelfDesc2[P <: Spore2[_, _, _]](fun: P)(implicit pickler: Pickler[P], unpickler: Unpickler[P]): SelfDescribing = {
     // pickle spore
     val newBuilder = binary.pickleFormat.createBuilder()
-    newBuilder.hintTag(pickler.tag)
+    newBuilder.hintElidedType(pickler.tag)
     pickler.asInstanceOf[Pickler[Any]].pickle(fun, newBuilder)
     val p = newBuilder.result()
     SelfDescribing(unpickler.getClass.getName, p.value)

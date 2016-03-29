@@ -34,7 +34,7 @@ trait SporePickler extends SimpleSporePicklerImpl {
     //TODO: check if U is a tuple
 
     val numVarsCaptured = utpe.typeArgs.size
-    // println(s"numVarsCaptured = $numVarsCaptured")
+    debug(s"numVarsCaptured = $numVarsCaptured")
     val sporeTypeName = TypeName("SporeWithEnv")
 
     debug(s"T: $ttpe, R: $rtpe, U: $utpe")
@@ -52,18 +52,17 @@ trait SporePickler extends SimpleSporePicklerImpl {
         def tag =
           implicitly[scala.pickling.FastTypeTag[scala.spores.Spore[$ttpe, $rtpe] { type Captured = $utpe }]]
 
-        def pickle(picklee: scala.spores.Spore[$ttpe, $rtpe] { type Captured = $utpe }, builder: scala.pickling.PBuilder): Unit = {
-          builder.beginEntry(picklee)
+        def pickle(picklee: scala.spores.Spore[$ttpe, $rtpe] { type Captured = $utpe },
+                   builder: scala.pickling.PBuilder): Unit = {
+          builder.beginEntry(picklee, tag)
 
           builder.putField("className", b => {
-            b.hintTag(scala.pickling.FastTypeTag.String)
-            b.hintStaticallyElidedType()
+            b.hintElidedType(scala.pickling.FastTypeTag.String)
             scala.pickling.pickler.AllPicklers.stringPickler.pickle(picklee.className, b)
           })
 
           builder.putField("captured", b => {
-            b.hintTag(capturedPickler.tag)
-            ${if (isEffectivelyPrimitive(utpe)) q"b.hintStaticallyElidedType()" else q""}
+            b.hintElidedType(capturedPickler.tag)
             capturedPickler.pickle(picklee.asInstanceOf[$sporeTypeName[$ttpe, $rtpe]].captured.asInstanceOf[$utpe], b)
           })
 
@@ -72,16 +71,14 @@ trait SporePickler extends SimpleSporePicklerImpl {
 
         def unpickle(tag: String, reader: scala.pickling.PReader): Any = {
           val reader1 = reader.readField($typeFieldName)
-          reader1.hintTag(scala.pickling.FastTypeTag.String)
-          reader1.hintStaticallyElidedType()
+          reader1.hintElidedType(scala.pickling.FastTypeTag.String)
 
           val tag = reader1.beginEntry()
           val result1 = scala.pickling.pickler.AllPicklers.stringPickler.unpickle(tag, reader1)
           reader1.endEntry()
 
           val reader2 = reader.readField("className")
-          reader2.hintTag(scala.pickling.FastTypeTag.String)
-          reader2.hintStaticallyElidedType()
+          reader2.hintElidedType(scala.pickling.FastTypeTag.String)
 
           val tag2 = reader2.beginEntry()
           val result = scala.pickling.pickler.AllPicklers.stringPickler.unpickle(tag2, reader2)
@@ -91,8 +88,7 @@ trait SporePickler extends SimpleSporePicklerImpl {
           val sporeInst = scala.concurrent.util.Unsafe.instance.allocateInstance(clazz).asInstanceOf[$sporeTypeName[$ttpe, $rtpe] { type Captured = $utpe }]
 
           val reader3 = reader.readField("captured")
-          reader3.hintTag(capturedUnpickler.tag)
-          ${if (isEffectivelyPrimitive(utpe)) q"reader3.hintStaticallyElidedType()" else q""}
+          reader3.hintElidedType(capturedUnpickler.tag)
           val tag3 = reader3.beginEntry()
           val result3 = capturedUnpickler.unpickle(tag3, reader3)
           reader3.endEntry()
@@ -111,6 +107,7 @@ trait SporePickler extends SimpleSporePicklerImpl {
   def genSporeCSPicklerImpl[T: c.WeakTypeTag, R: c.WeakTypeTag, U: c.WeakTypeTag]
         (c: Context)(cPickler: c.Tree): c.Tree = {
     import c.universe._
+
     val ttpe = weakTypeOf[T]
     val rtpe = weakTypeOf[R]
     val utpe = weakTypeOf[U]
@@ -132,18 +129,16 @@ trait SporePickler extends SimpleSporePicklerImpl {
           implicitly[scala.pickling.FastTypeTag[scala.spores.SporeWithEnv[$ttpe, $rtpe] { type Captured = $utpe }]]
 
         def pickle(picklee: scala.spores.SporeWithEnv[$ttpe, $rtpe] { type Captured = $utpe }, builder: scala.pickling.PBuilder): Unit = {
-          // println("[genSporeCSPicklerImpl]")
-          builder.beginEntry(picklee)
+          debug("[genSporeCSPickler] creating pickler")
+          builder.beginEntry(picklee, tag)
 
           builder.putField("className", b => {
-            b.hintTag(scala.pickling.FastTypeTag.String)
-            b.hintStaticallyElidedType()
+            b.hintElidedType(scala.pickling.FastTypeTag.String)
             scala.pickling.pickler.AllPicklers.stringPickler.pickle(picklee.className, b)
           })
 
           builder.putField("captured", b => {
-            b.hintTag(capturedPickler.tag)
-            ${if (isEffectivelyPrimitive(utpe)) q"b.hintStaticallyElidedType()" else q""}
+            b.hintElidedType(capturedPickler.tag)
             capturedPickler.pickle(picklee.asInstanceOf[$sporeTypeName[$ttpe, $rtpe]].captured.asInstanceOf[$utpe], b)
           })
 
@@ -156,6 +151,7 @@ trait SporePickler extends SimpleSporePicklerImpl {
 
   def genSporeCMPicklerImpl[T: c.WeakTypeTag, R: c.WeakTypeTag, U: c.WeakTypeTag]
         (c: Context)(cPickler: c.Tree, cUnpickler: c.Tree): c.Tree = {
+
     import c.universe._
     import definitions.ArrayClass
 
@@ -174,7 +170,6 @@ trait SporePickler extends SimpleSporePicklerImpl {
     //TODO: check if U is a tuple
 
     val numVarsCaptured = utpe.typeArgs.size
-    // println(s"numVarsCaptured = $numVarsCaptured")
     val sporeTypeName = TypeName("SporeWithEnv")
 
     debug(s"T: $ttpe, R: $rtpe, U: $utpe")
@@ -192,18 +187,16 @@ trait SporePickler extends SimpleSporePicklerImpl {
           implicitly[scala.pickling.FastTypeTag[scala.spores.SporeWithEnv[$ttpe, $rtpe] { type Captured = $utpe }]]
 
         def pickle(picklee: scala.spores.SporeWithEnv[$ttpe, $rtpe] { type Captured = $utpe }, builder: scala.pickling.PBuilder): Unit = {
-          // println("[genSporeCMPicklerImpl]")
-          builder.beginEntry(picklee)
+          debug("[genSporeCMPickler] creating pickler")
+          builder.beginEntry(picklee, tag)
 
           builder.putField("className", b => {
-            b.hintTag(scala.pickling.FastTypeTag.String)
-            b.hintStaticallyElidedType()
+            b.hintElidedType(scala.pickling.FastTypeTag.String)
             scala.pickling.pickler.AllPicklers.stringPickler.pickle(picklee.className, b)
           })
 
           builder.putField("captured", b => {
-            b.hintTag(capturedPickler.tag)
-            ${if (isEffectivelyPrimitive(utpe)) q"b.hintStaticallyElidedType()" else q""}
+            b.hintElidedType(capturedPickler.tag)
             capturedPickler.pickle(picklee.asInstanceOf[$sporeTypeName[$ttpe, $rtpe]].captured.asInstanceOf[$utpe], b)
           })
 
@@ -212,28 +205,25 @@ trait SporePickler extends SimpleSporePicklerImpl {
 
         def unpickle(tag: String, reader: scala.pickling.PReader): Any = {
           val reader1 = reader.readField($typeFieldName)
-          reader1.hintTag(scala.pickling.FastTypeTag.String)
-          reader1.hintStaticallyElidedType()
+          reader1.hintElidedType(scala.pickling.FastTypeTag.String)
 
           val tag = reader1.beginEntry()
           val result1 = scala.pickling.pickler.AllPicklers.stringPickler.unpickle(tag, reader1)
           reader1.endEntry()
 
           val reader2 = reader.readField("className")
-          reader2.hintTag(scala.pickling.FastTypeTag.String)
-          reader2.hintStaticallyElidedType()
+          reader2.hintElidedType(scala.pickling.FastTypeTag.String)
 
           val tag2 = reader2.beginEntry()
           val result = scala.pickling.pickler.AllPicklers.stringPickler.unpickle(tag2, reader2)
           reader2.endEntry()
 
-          // println("[genSporeCMPicklerImpl] creating instance of class " + result)
+          debug("[genSporeCMPicklerImpl] creating instance of class " + result)
           val clazz = java.lang.Class.forName(result.asInstanceOf[String])
           val sporeInst = scala.concurrent.util.Unsafe.instance.allocateInstance(clazz).asInstanceOf[$sporeTypeName[$ttpe, $rtpe] { type Captured = $utpe }]
 
           val reader3 = reader.readField("captured")
-          reader3.hintTag(capturedUnpickler.tag)
-          ${if (isEffectivelyPrimitive(utpe)) q"reader3.hintStaticallyElidedType()" else q""}
+          reader3.hintElidedType(capturedUnpickler.tag)
           val tag3 = reader3.beginEntry()
           val result3 = capturedUnpickler.unpickle(tag3, reader3)
           reader3.endEntry()
@@ -251,6 +241,7 @@ trait SporePickler extends SimpleSporePicklerImpl {
 
   def genSpore2CMPicklerImpl[T1: c.WeakTypeTag, T2: c.WeakTypeTag, R: c.WeakTypeTag, U: c.WeakTypeTag]
         (c: Context)(cPickler: c.Tree, cUnpickler: c.Tree): c.Tree = {
+
     import c.universe._
     import definitions.ArrayClass
 
@@ -268,7 +259,6 @@ trait SporePickler extends SimpleSporePicklerImpl {
     //TODO: check if U is a tuple
 
     val numVarsCaptured = utpe.typeArgs.size
-    // println(s"numVarsCaptured = $numVarsCaptured")
     val picklerName = c.freshName(TermName("Spore2CMPickler"))
     val typeFieldName = """$type"""
 
@@ -281,18 +271,16 @@ trait SporePickler extends SimpleSporePicklerImpl {
           implicitly[scala.pickling.FastTypeTag[scala.spores.Spore2WithEnv[$t1tpe, $t2tpe, $rtpe] { type Captured = $utpe }]]
 
         def pickle(picklee: scala.spores.Spore2WithEnv[$t1tpe, $t2tpe, $rtpe] { type Captured = $utpe }, builder: scala.pickling.PBuilder): Unit = {
-          // println("[genSpore2CMPicklerImpl]")
-          builder.beginEntry(picklee)
+          debug("[genSpore2CMPicklerImpl]")
+          builder.beginEntry(picklee, tag)
 
           builder.putField("className", b => {
-            b.hintTag(scala.pickling.FastTypeTag.String)
-            b.hintStaticallyElidedType()
+            b.hintElidedType(scala.pickling.FastTypeTag.String)
             scala.pickling.pickler.AllPicklers.stringPickler.pickle(picklee.className, b)
           })
 
           builder.putField("captured", b => {
-            b.hintTag(capturedPickler.tag)
-            ${if (isEffectivelyPrimitive(utpe)) q"b.hintStaticallyElidedType()" else q""}
+            b.hintElidedType(capturedPickler.tag)
             capturedPickler.pickle(picklee.asInstanceOf[scala.spores.Spore2WithEnv[$t1tpe, $t2tpe, $rtpe]].captured.asInstanceOf[$utpe], b)
           })
 
@@ -305,6 +293,7 @@ trait SporePickler extends SimpleSporePicklerImpl {
 
   def genSpore3CMPicklerImpl[T1: c.WeakTypeTag, T2: c.WeakTypeTag, T3: c.WeakTypeTag, R: c.WeakTypeTag, U: c.WeakTypeTag]
         (c: Context)(cPickler: c.Tree, cUnpickler: c.Tree): c.Tree = {
+
     import c.universe._
     import definitions.ArrayClass
 
@@ -323,11 +312,8 @@ trait SporePickler extends SimpleSporePicklerImpl {
     //TODO: check if U is a tuple
 
     val numVarsCaptured = utpe.typeArgs.size
-    // println(s"numVarsCaptured = $numVarsCaptured")
     val picklerName = c.freshName(TermName("Spore3CMPickler"))
     val typeFieldName = """$type"""
-
-    // ${if (isEffectivelyPrimitive(utpe)) q"b.hintStaticallyElidedType()" else q""}
 
     q"""
       val capturedPickler = $cPickler
@@ -338,17 +324,16 @@ trait SporePickler extends SimpleSporePicklerImpl {
           implicitly[scala.pickling.FastTypeTag[scala.spores.Spore3WithEnv[$t1tpe, $t2tpe, $t3tpe, $rtpe] { type Captured = $utpe }]]
 
         def pickle(picklee: scala.spores.Spore3WithEnv[$t1tpe, $t2tpe, $t3tpe, $rtpe] { type Captured = $utpe }, builder: scala.pickling.PBuilder): Unit = {
-          // println("[genSpore3CMPicklerImpl]")
-          builder.beginEntry(picklee)
+          debug("[genSpore3CMPicklerImpl]")
+          builder.beginEntry(picklee, tag)
 
           builder.putField("className", b => {
-            b.hintTag(scala.pickling.FastTypeTag.String)
-            b.hintStaticallyElidedType()
+            b.hintElidedType(scala.pickling.FastTypeTag.String)
             scala.pickling.pickler.AllPicklers.stringPickler.pickle(picklee.className, b)
           })
 
           builder.putField("captured", b => {
-            b.hintTag(capturedPickler.tag)
+            b.hintElidedType(capturedPickler.tag)
             capturedPickler.pickle(picklee.asInstanceOf[scala.spores.Spore3WithEnv[$t1tpe, $t2tpe, $t3tpe, $rtpe]].captured.asInstanceOf[$utpe], b)
           })
 
@@ -362,13 +347,16 @@ trait SporePickler extends SimpleSporePicklerImpl {
 
   def genSporeCSUnpicklerImpl[T: c.WeakTypeTag, R: c.WeakTypeTag](c: Context): c.Tree = {
     import c.universe._
+
     val ttpe = weakTypeOf[T]
     val rtpe = weakTypeOf[R]
     debug(s"T: $ttpe, R: $rtpe")
+
     val unpicklerName = c.freshName(TermName("SporeUnpickler"))
     val utils = new PicklerUtils[c.type](c)
     val reader = TermName("reader")
     val readClassName = utils.readClassNameTree(reader)
+
     q"""
       object $unpicklerName extends scala.pickling.Unpickler[scala.spores.Spore[$ttpe, $rtpe]] {
         def tag =
@@ -377,7 +365,7 @@ trait SporePickler extends SimpleSporePicklerImpl {
         def unpickle(tag: String, $reader: scala.pickling.PReader): Any = {
           val result = $readClassName
 
-          // println("[genSporeCSUnpicklerImpl] creating instance of class " + result)
+          debug("[genSporeCSUnpicklerImpl] creating instance of class " + result)
           val clazz = java.lang.Class.forName(result)
           val sporeInst = (try clazz.newInstance() catch {
             case t: Throwable =>
@@ -389,18 +377,22 @@ trait SporePickler extends SimpleSporePicklerImpl {
           }).asInstanceOf[scala.spores.Spore[$ttpe, $rtpe]]
 
           if (sporeInst.isInstanceOf[scala.spores.SporeWithEnv[$ttpe, $rtpe]]) {
-            // println("[genSporeCSUnpicklerImpl] spore class is SporeWithEnv")
+            debug("[genSporeCSUnpicklerImpl] spore class is SporeWithEnv")
             val sporeWithEnvInst = sporeInst.asInstanceOf[scala.spores.SporeWithEnv[$ttpe, $rtpe]]
             val reader3 = $reader.readField("captured")
+
             val tag3 = reader3.beginEntry()
             val value = {
               if (reader3.atPrimitive) {
                 reader3.readPrimitive()
               } else {
-                val unpickler3 = scala.pickling.runtime.RuntimeUnpicklerLookup.genUnpickler(scala.reflect.runtime.currentMirror, tag3)
+                import scala.pickling.internal.currentRuntime
+                val mirror = currentRuntime.currentMirror
+                val unpickler3 = currentRuntime.picklers.genUnpickler(mirror, tag3)
                 unpickler3.unpickle(tag3, reader3)
               }
             }
+
             reader3.endEntry()
             val capturedValField = clazz.getDeclaredField("captured")
             capturedValField.setAccessible(true)
@@ -416,6 +408,7 @@ trait SporePickler extends SimpleSporePicklerImpl {
 
   def genSpore2CSUnpicklerImpl[T1: c.WeakTypeTag, T2: c.WeakTypeTag, R: c.WeakTypeTag](c: Context): c.Tree = {
     import c.universe._
+
     val t1tpe = weakTypeOf[T1]
     val t2tpe = weakTypeOf[T2]
     val rtpe = weakTypeOf[R]
@@ -433,7 +426,7 @@ trait SporePickler extends SimpleSporePicklerImpl {
         def unpickle(tag: String, $reader: scala.pickling.PReader): Any = {
           val result = $readClassName
 
-          // println("[genSpore2CSUnpicklerImpl] creating instance of class " + result)
+          debug("[genSpore2CSUnpicklerImpl] creating instance of class " + result)
           val clazz = java.lang.Class.forName(result)
           val sporeInst = (try clazz.newInstance() catch {
             case t: Throwable =>
@@ -445,15 +438,19 @@ trait SporePickler extends SimpleSporePicklerImpl {
           }).asInstanceOf[scala.spores.Spore2[$t1tpe, $t2tpe, $rtpe]]
 
           if (sporeInst.isInstanceOf[scala.spores.Spore2WithEnv[$t1tpe, $t2tpe, $rtpe]]) {
-            // println("[genSpore2CSUnpicklerImpl] spore class is Spore2WithEnv")
+            debug("[genSpore2CSUnpicklerImpl] spore class is Spore2WithEnv")
             val sporeWithEnvInst = sporeInst.asInstanceOf[scala.spores.Spore2WithEnv[$t1tpe, $t2tpe, $rtpe]]
             val reader3 = $reader.readField("captured")
+            reader3.hintElidedType(scala.pickling.FastTypeTag.String)
+
             val tag3 = reader3.beginEntry()
             val value = {
               if (reader3.atPrimitive) {
                 reader3.readPrimitive()
               } else {
-                val unpickler3 = scala.pickling.runtime.RuntimeUnpicklerLookup.genUnpickler(scala.reflect.runtime.currentMirror, tag3)
+                import scala.pickling.internal.currentRuntime
+                val mirror = currentRuntime.currentMirror
+                val unpickler3 = currentRuntime.picklers.genUnpickler(mirror, tag3)
                 unpickler3.unpickle(tag3, reader3)
               }
             }
@@ -497,24 +494,27 @@ trait SporePickler extends SimpleSporePicklerImpl {
 
         def unpickle(tag: String, reader: scala.pickling.PReader): Any = {
           val reader2 = reader.readField("className")
-          reader2.hintTag(scala.pickling.FastTypeTag.String)
-          reader2.hintStaticallyElidedType()
+          reader2.hintElidedType(scala.pickling.FastTypeTag.String)
 
           val tag2 = reader2.beginEntry()
           val result = scala.pickling.pickler.AllPicklers.stringPickler.unpickle(tag2, reader2)
           reader2.endEntry()
 
-          // println("creating instance of class " + result)
+          debug("creating instance of class " + result)
           val clazz = java.lang.Class.forName(result.asInstanceOf[String])
           val sporeInst = scala.concurrent.util.Unsafe.instance.allocateInstance(clazz).asInstanceOf[scala.spores.Spore2WithEnv[$t1tpe, $t2tpe, $rtpe]]
 
           val reader3 = reader.readField("captured")
+          reader3.hintElidedType(scala.pickling.FastTypeTag.String)
+
           val tag3 = reader3.beginEntry()
           val value = {
             if (reader3.atPrimitive) {
               reader3.readPrimitive()
             } else {
-              val unpickler3 = scala.pickling.runtime.RuntimeUnpicklerLookup.genUnpickler(scala.reflect.runtime.currentMirror, tag3)
+              import scala.pickling.internal.currentRuntime
+              val mirror = currentRuntime.currentMirror
+              val unpickler3 = currentRuntime.picklers.genUnpickler(mirror, tag3)
               unpickler3.unpickle(tag3, reader3)
             }
           }
@@ -555,14 +555,13 @@ trait SporePickler extends SimpleSporePicklerImpl {
 
         def unpickle(tag: String, reader: scala.pickling.PReader): Any = {
           val reader2 = reader.readField("className")
-          reader2.hintTag(scala.pickling.FastTypeTag.String)
-          reader2.hintStaticallyElidedType()
+          reader2.hintElidedType(scala.pickling.FastTypeTag.String)
 
           val tag2 = reader2.beginEntry()
           val result = scala.pickling.pickler.AllPicklers.stringPickler.unpickle(tag2, reader2)
           reader2.endEntry()
 
-          // println("creating instance of class " + result)
+          debug("creating instance of class " + result)
           val clazz = java.lang.Class.forName(result.asInstanceOf[String])
           val sporeInst = (try clazz.newInstance() catch {
             case t: Throwable =>
@@ -574,12 +573,16 @@ trait SporePickler extends SimpleSporePicklerImpl {
           }).asInstanceOf[scala.spores.SporeWithEnv[$ttpe, $rtpe]]
 
           val reader3 = reader.readField("captured")
+          reader3.hintElidedType(scala.pickling.FastTypeTag.String)
+
           val tag3 = reader3.beginEntry()
           val value = {
             if (reader3.atPrimitive) {
               reader3.readPrimitive()
             } else {
-              val unpickler3 = scala.pickling.runtime.RuntimeUnpicklerLookup.genUnpickler(scala.reflect.runtime.currentMirror, tag3)
+              import scala.pickling.internal.currentRuntime
+              val mirror = currentRuntime.currentMirror
+              val unpickler3 = currentRuntime.picklers.genUnpickler(mirror, tag3)
               unpickler3.unpickle(tag3, reader3)
             }
           }
@@ -597,6 +600,7 @@ trait SporePickler extends SimpleSporePicklerImpl {
 
   def genSpore3CSUnpicklerImpl[T1: c.WeakTypeTag, T2: c.WeakTypeTag, T3: c.WeakTypeTag, R: c.WeakTypeTag](c: Context): c.Tree = {
     import c.universe._
+
     val t1tpe = weakTypeOf[T1]
     val t2tpe = weakTypeOf[T2]
     val t3tpe = weakTypeOf[T3]
@@ -615,7 +619,7 @@ trait SporePickler extends SimpleSporePicklerImpl {
         def unpickle(tag: String, $reader: scala.pickling.PReader): Any = {
           val result = $readClassName
 
-          // println("[genSpore3CSUnpicklerImpl] creating instance of class " + result)
+          debug("[genSpore3CSUnpicklerImpl] creating instance of class " + result)
           val clazz = java.lang.Class.forName(result)
           val sporeInst = (try clazz.newInstance() catch {
             case t: Throwable =>
@@ -627,15 +631,19 @@ trait SporePickler extends SimpleSporePicklerImpl {
           }).asInstanceOf[scala.spores.Spore3[$t1tpe, $t2tpe, $t3tpe, $rtpe]]
 
           if (sporeInst.isInstanceOf[scala.spores.Spore3WithEnv[$t1tpe, $t2tpe, $t3tpe, $rtpe]]) {
-            // println("[genSpore3CSUnpicklerImpl] spore class is Spore3WithEnv")
+            debug("[genSpore3CSUnpicklerImpl] spore class is Spore3WithEnv")
             val sporeWithEnvInst = sporeInst.asInstanceOf[scala.spores.Spore3WithEnv[$t1tpe, $t2tpe, $t3tpe, $rtpe]]
             val reader3 = $reader.readField("captured")
+            reader3.hintElidedType(scala.pickling.FastTypeTag.String)
+
             val tag3 = reader3.beginEntry()
             val value = {
               if (reader3.atPrimitive) {
                 reader3.readPrimitive()
               } else {
-                val unpickler3 = scala.pickling.runtime.RuntimeUnpicklerLookup.genUnpickler(scala.reflect.runtime.currentMirror, tag3)
+                import scala.pickling.internal.currentRuntime
+                val mirror = currentRuntime.currentMirror
+                val unpickler3 = currentRuntime.picklers.genUnpickler(mirror, tag3)
                 unpickler3.unpickle(tag3, reader3)
               }
             }
@@ -654,9 +662,23 @@ trait SporePickler extends SimpleSporePicklerImpl {
 }
 
 object SporePickler extends SporePickler {
-  /*implicit*/
-  def genSporePickler[T, R, U](implicit cPickler: Pickler[U], cUnpickler: Unpickler[U])
-    : Pickler[Spore[T, R] { type Captured = U }] with Unpickler[Spore[T, R] { type Captured = U }] = macro genSporePicklerImpl[T, R, U]
+
+  /* Unify type for returning both a pickler and unpickler
+   * that keeps track of the captured type inside a `Spore` */
+  type FullP[T, R, C] = Pickler[Spore[T, R] {type Captured = C}]
+  type FullU[T, R, C] = Unpickler[Spore[T, R] {type Captured = C}]
+  type FullPU[T, R, C] = FullP[T, R, C] with FullU[T, R, C]
+
+  /* Unify type for returning both a pickler and unpickler
+   * that keeps track of the captured type inside a `SporeWithEnv` */
+  type FullPE[T, R, C] = Pickler[SporeWithEnv[T, R] {type Captured = C}]
+  type FullUE[T, R, C] = Unpickler[SporeWithEnv[T, R] {type Captured = C}]
+  type FullPUE[T, R, C] = FullPE[T, R, C] with FullUE[T, R, C]
+
+  // NOTE Should this be implicit?
+  def genSporePickler[T, R, U]
+    (implicit cPickler: Pickler[U], cUnpickler: Unpickler[U]): FullPU[T, R, U] =
+      macro genSporePicklerImpl[T, R, U]
 
   implicit def genSimpleSporePickler[T, R]: Pickler[Spore[T, R]] =
     macro genSimpleSporePicklerImpl[T, R]
@@ -664,17 +686,20 @@ object SporePickler extends SporePickler {
   implicit def genSimpleSpore2Pickler[T1, T2, R]: Pickler[Spore2[T1, T2, R]] =
     macro genSimpleSpore2PicklerImpl[T1, T2, R]
 
-  implicit def genSimpleSpore3Pickler[T1, T2, T3, R]: Pickler[Spore3[T1, T2, T3, R]] =
-    macro genSimpleSpore3PicklerImpl[T1, T2, T3, R]
+  implicit def genSimpleSpore3Pickler[T1, T2, T3, R]
+    : Pickler[Spore3[T1, T2, T3, R]] =
+      macro genSimpleSpore3PicklerImpl[T1, T2, T3, R]
 
-  // type `U` </: `Product`
-  implicit def genSporeCSPickler[T, R, U](implicit cPickler: Pickler[U]): Pickler[SporeWithEnv[T, R] { type Captured = U }] =
+  // type `U` </: `Product`?
+  implicit def genSporeCSPickler[T, R, U]
+    (implicit cPickler: Pickler[U]): Pickler[SporeWithEnv[T, R] { type Captured = U }] =
     macro genSporeCSPicklerImpl[T, R, U]
 
   // TODO: probably need also implicit macro for Pickler[Spore[T, R] { type Captured = U }]
   // capture > 1 variables
-  implicit def genSporeCMPickler[T, R, U <: Product](implicit cPickler: Pickler[U], cUnpickler: Unpickler[U])
-    : Pickler[SporeWithEnv[T, R] { type Captured = U }] with Unpickler[SporeWithEnv[T, R] { type Captured = U }] = macro genSporeCMPicklerImpl[T, R, U]
+  implicit def genSporeCMPickler[T, R, U <: Product]
+    (implicit cPickler: Pickler[U], cUnpickler: Unpickler[U]): FullPUE[T, R, U] =
+      macro genSporeCMPicklerImpl[T, R, U]
 
   // capture > 1 variables
   implicit def genSpore2CMPickler[T1, T2, R, U <: Product](implicit cPickler: Pickler[U], cUnpickler: Unpickler[U])
@@ -684,6 +709,10 @@ object SporePickler extends SporePickler {
   implicit def genSpore3CMPickler[T1, T2, T3, R, U <: Product](implicit cPickler: Pickler[U], cUnpickler: Unpickler[U])
     : Pickler[Spore3WithEnv[T1, T2, T3, R] { type Captured = U }] = macro genSpore3CMPicklerImpl[T1, T2, T3, R, U]
 
+  // NOTE This is probably never picked because U is not present when we annotate the type for unpickling
+  implicit def genSporeCMUnpickler[T, R, U <: Product]: Unpickler[SporeWithEnv[T, R] { type Captured = U }] =
+    macro genSporeCMUnpicklerImpl[T, R, U]
+
   implicit def genSporeCSUnpickler[T, R]: Unpickler[Spore[T, R]/* { type Captured }*/] =
     macro genSporeCSUnpicklerImpl[T, R]
 
@@ -692,9 +721,6 @@ object SporePickler extends SporePickler {
 
   implicit def genSpore2CMUnpickler[T1, T2, R, U]: Unpickler[Spore2WithEnv[T1, T2, R] { type Captured = U }] =
     macro genSpore2CMUnpicklerImpl[T1, T2, R, U]
-
-  implicit def genSporeCMUnpickler[T, R, U]: Unpickler[SporeWithEnv[T, R] { type Captured = U }] =
-    macro genSporeCMUnpicklerImpl[T, R, U]
 
   implicit def genSpore3CSUnpickler[T1, T2, T3, R]: Unpickler[Spore3[T1, T2, T3, R]] =
     macro genSpore3CSUnpicklerImpl[T1, T2, T3, R]

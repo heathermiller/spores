@@ -43,7 +43,7 @@ class PicklingBinarySpec {
     val format = implicitly[PickleFormat]
     val builder = format.createBuilder
 
-    builder.hintTag(implicitly[FastTypeTag[Spore[Int, String]]])
+    builder.hintElidedType(implicitly[FastTypeTag[Spore[Int, String]]])
     pickler.pickle(s, builder)
     val res = builder.result()
 
