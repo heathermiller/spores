@@ -15,7 +15,7 @@ import SporePickler._
 @RunWith(classOf[JUnit4])
 class PicklingSpec {
   @Test
-  def `pickle/unpickle to/from JSON`(): Unit = {
+  def `pickle/unpickle to/from JSON with one captured variable`(): Unit = {
     val v1 = 10
     val s = spore {
       val c1 = v1
@@ -28,7 +28,6 @@ class PicklingSpec {
     val format = implicitly[PickleFormat]
     val builder = format.createBuilder
 
-    builder.hintTag(implicitly[FastTypeTag[Spore[Int, String]]])
     pickler.pickle(s, builder)
     val res = builder.result()
 
@@ -54,7 +53,7 @@ class PicklingSpec {
     val pickler = SporePickler.genSporePickler[Int, String, Int]
     val builder = implicitly[PickleFormat].createBuilder
     val res = {
-      builder.hintTag(implicitly[FastTypeTag[Spore[Int, String]]])
+      builder.hintElidedType(implicitly[FastTypeTag[Spore[Int, String]]])
       pickler.pickle(s, builder)
       builder.result()
     }
@@ -67,7 +66,7 @@ class PicklingSpec {
   @Test
   def `pickling spore with two captured variables`(): Unit = {
     val v1 = 10
-    val v2 = "hello"
+    val v2 = "hello1"
     val s = spore {
       val c1 = v1
       val c2 = v2
@@ -78,15 +77,14 @@ class PicklingSpec {
     val format  = implicitly[PickleFormat]
     val builder = format.createBuilder
     val res = {
-      builder.hintTag(implicitly[FastTypeTag[Spore[Int, String]]])
       pickler.pickle(s, builder)
       builder.result()
     }
 
+    System.out.println(s"res1: ${res.value}")
     assert(res.value.toString.endsWith(""""captured": {
-      |    "$type": "scala.Tuple2[scala.Int,java.lang.String]",
       |    "_1": 10,
-      |    "_2": "hello"
+      |    "_2": "hello1"
       |  }
       |}""".stripMargin))
 
@@ -94,22 +92,24 @@ class PicklingSpec {
     val up = pickler.unpickle("scala.spores.Spore[Int, String]", reader)
     val us = up.asInstanceOf[Spore[Int, String]]
     val res2 = us(5)
-    assert(res2 == "arg: 5, c1: 10, c2: hello")
+    System.out.println(s"res2: ${res2.value}")
+    assert(res2 == "arg: 5, c1: 10, c2: hello1")
   }
 
   @Test
   def `simple pickling of spore with two captured variables`(): Unit = {
     val v1 = 10
-    val v2 = "hello"
+    val v2 = "hello2"
     val s = spore {
       val c1 = v1
       val c2 = v2
       (x: Int) => s"arg: $x, c1: $c1, c2: $c2"
     }
     val res  = s.pickle
-    val up   = res.unpickle[Spore[Int, String]]
+    System.out.println(res.value)
+    val up   = res.value.unpickle[SporeWithEnv[Int, String]]
     val res2 = up(5)
-    assert(res2 == "arg: 5, c1: 10, c2: hello")
+    assert(res2 == "arg: 5, c1: 10, c2: hello2")
   }
 
   @Test

@@ -10,7 +10,6 @@ package scala.spores
 
 import scala.reflect.macros.blackbox.Context
 
-
 private[spores] class PicklerUtils[C <: Context with Singleton](val c: C) {
   import c.universe._
 
@@ -18,12 +17,11 @@ private[spores] class PicklerUtils[C <: Context with Singleton](val c: C) {
     val result = c.freshName(TermName("result"))
     q"""
       val reader2 = $reader.readField("className")
-      reader2.hintTag(scala.pickling.FastTypeTag.String)
-      reader2.hintStaticallyElidedType()
+      reader2.hintElidedType(scala.pickling.FastTypeTag.String)
       val tag2 = reader2.beginEntry()
-      val $result = scala.pickling.pickler.AllPicklers.stringPickler.unpickle(tag2, reader2).asInstanceOf[String]
+      val $result = scala.pickling.pickler.AllPicklers.stringPickler.unpickle(tag2, reader2)
       reader2.endEntry()
-      $result
+      $result.asInstanceOf[String]
     """
   }
 
