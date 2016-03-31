@@ -14,6 +14,7 @@ import SporePickler._
 
 @RunWith(classOf[JUnit4])
 class Issue15Spec {
+
   @Test
   def test(): Unit = {
     val s = spore {
