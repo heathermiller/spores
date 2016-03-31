@@ -14,6 +14,7 @@ import SporePickler._
 
 @RunWith(classOf[JUnit4])
 class PicklingSpec {
+
   @Test
   def `pickle/unpickle to/from JSON with one captured variable`(): Unit = {
     val v1 = 10
@@ -22,45 +23,14 @@ class PicklingSpec {
       (x: Int) => s"arg: $x, c1: $c1"
     }
 
-    val pickler: Pickler[Spore[Int, String] { type Captured = Int }] with Unpickler[Spore[Int, String] { type Captured = Int }] =
-      SporePickler.genSporePickler[Int, String, Int]
-
-    val format = implicitly[PickleFormat]
-    val builder = format.createBuilder
-
-    pickler.pickle(s, builder)
-    val res = builder.result()
-
-    assert(res.value.toString.endsWith("""
-  "captured": 10
-}"""))
-
-    val reader = format.createReader(res.asInstanceOf[format.PickleType])
-    val up = pickler.unpickle("scala.spores.Spore[Int, String]", reader)
-    val us = up.asInstanceOf[Spore[Int, String]]
-    val res2 = us(5)
-    assert(res2 == "arg: 5, c1: 10")
-  }
-
-  @Test
-  def `simplified spore pickling`(): Unit = {
-    val v1 = 10
-    val s = spore {
-      val c1 = v1
-      (x: Int) => s"arg: $x, c1: $c1"
-    }
-
-    val pickler = SporePickler.genSporePickler[Int, String, Int]
-    val builder = implicitly[PickleFormat].createBuilder
-    val res = {
-      builder.hintElidedType(implicitly[FastTypeTag[Spore[Int, String]]])
-      pickler.pickle(s, builder)
-      builder.result()
-    }
-
+    val res = s.pickle
     assert(res.value.toString.endsWith("""
       |  "captured": 10
       |}""".stripMargin))
+
+    val up = res.value.unpickle[Spore[Int, String]]
+    val res2 = up(5)
+    assert(res2 == "arg: 5, c1: 10")
   }
 
   @Test
@@ -73,7 +43,8 @@ class PicklingSpec {
       (x: Int) => s"arg: $x, c1: $c1, c2: $c2"
     }
 
-    val pickler = SporePickler.genSporeCMPickler[Int, String, (Int, String)]
+    val pickler = SporePickler.genSporePicklerUnpickler[Int, String, (Int, String)]
+  
     val format  = implicitly[PickleFormat]
     val builder = format.createBuilder
     val res = {
@@ -89,9 +60,9 @@ class PicklingSpec {
       |}""".stripMargin))
 
     val reader = format.createReader(res.asInstanceOf[format.PickleType])
-    val up = pickler.unpickle("scala.spores.Spore[Int, String]", reader)
-    val us = up.asInstanceOf[Spore[Int, String]]
-    val res2 = us(5)
+    val unpickler = SporePickler.genSporeUnpickler[Int, String]
+    val up = unpickler.unpickle("", reader).asInstanceOf[Spore[Int, String]]
+    val res2 = up(5)
     System.out.println(s"res2: ${res2.value}")
     assert(res2 == "arg: 5, c1: 10, c2: hello1")
   }
@@ -105,9 +76,9 @@ class PicklingSpec {
       val c2 = v2
       (x: Int) => s"arg: $x, c1: $c1, c2: $c2"
     }
+
     val res  = s.pickle
-    System.out.println(res.value)
-    val up   = res.value.unpickle[SporeWithEnv[Int, String]]
+    val up   = res.value.unpickle[Spore[Int, String]]
     val res2 = up(5)
     assert(res2 == "arg: 5, c1: 10, c2: hello2")
   }
@@ -168,7 +139,7 @@ class PicklingSpec {
   }
 
   @Test
-  def testPickleUnpickleSporeWithTypeRefinement(): Unit = {
+  def `test pickling/unpickling spore with type refinement`(): Unit = {
     val v1 = 10
     val v2 = "hello"
     val s = spore {

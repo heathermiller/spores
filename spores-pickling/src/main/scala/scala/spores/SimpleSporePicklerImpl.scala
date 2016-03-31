@@ -14,96 +14,93 @@ import scala.pickling._
 
 trait SimpleSporePicklerImpl {
 
-  def genSimpleSporePicklerImpl[T: c.WeakTypeTag, R: c.WeakTypeTag](c: Context): c.Tree = {
+  def genSimpleSporePicklerUnpicklerTemplate(c: Context)
+    (seedPicklerName: String, sporeType: c.Tree): c.Tree = {
+
     import c.universe._
 
-    debug("Using genSimpleSporePicklerImpl")
+    val utils = new PicklerUtils[c.type](c)
+    val picklee = TermName("picklee")
+    val readerName = TermName("reader")
+    val builderName = TermName("builder")
+    val className = TermName("className")
+    val picklerName = c.freshName(TermName(seedPicklerName))
+
+    q"""
+      object $picklerName
+          extends scala.pickling.Pickler[$sporeType] 
+             with scala.pickling.Unpickler[$sporeType] {
+
+        def tag = implicitly[scala.pickling.FastTypeTag[$sporeType]]
+
+        def pickle(picklee: $sporeType, builder: scala.pickling.PBuilder): Unit = {
+
+          builder.beginEntry(picklee, tag)
+          ${utils.writeClassName(builderName, picklee)}
+          ${utils.writeUnpicklerClassName(builderName, picklerName)}
+          builder.endEntry()
+
+        }
+
+        def unpickle(tag: String, reader: scala.pickling.PReader): Any = {
+
+          val className = ${utils.readClassName(readerName)}
+          ${utils.createInstance(className, sporeType)}
+
+        }
+      }
+
+      $picklerName
+    """
+
+
+  }
+
+  def genSimpleSporePicklerImpl
+      [T: c.WeakTypeTag, R: c.WeakTypeTag](c: Context): c.Tree = {
+
+    import c.universe._
 
     val ttpe = weakTypeOf[T]
     val rtpe = weakTypeOf[R]
     debug(s"T: $ttpe, R: $rtpe")
 
-    val picklerName = c.freshName(TermName("SimpleSporePickler"))
+    val sporeType = tq"scala.spores.Spore[$ttpe, $rtpe]"
+    genSimpleSporePicklerUnpicklerTemplate(c)("SimpleSporePickler", sporeType)
 
-    q"""
-      object $picklerName extends scala.pickling.Pickler[scala.spores.Spore[$ttpe, $rtpe]] {
-        def tag =
-          implicitly[scala.pickling.FastTypeTag[scala.spores.Spore[$ttpe, $rtpe]]]
-
-        def pickle(picklee: scala.spores.Spore[$ttpe, $rtpe], builder: scala.pickling.PBuilder): Unit = {
-          builder.beginEntry(picklee, tag)
-
-          builder.putField("className", b => {
-            b.hintElidedType(scala.pickling.FastTypeTag.String)
-            scala.pickling.pickler.AllPicklers.stringPickler.pickle(picklee.className, b)
-          })
-
-          builder.endEntry()
-        }
-      }
-      $picklerName
-    """
   }
 
-  def genSimpleSpore2PicklerImpl[T1: c.WeakTypeTag, T2: c.WeakTypeTag, R: c.WeakTypeTag](c: Context): c.Tree = {
-    import c.universe._
+  def genSimpleSpore2PicklerImpl
+      [T1: c.WeakTypeTag, T2: c.WeakTypeTag, R: c.WeakTypeTag]
+      (c: Context): c.Tree = {
 
-    debug("Using genSimpleSpore2PicklerImpl")
+    import c.universe._
 
     val t1tpe = weakTypeOf[T1]
     val t2tpe = weakTypeOf[T2]
     val rtpe = weakTypeOf[R]
-    val picklerName = c.freshName(TermName("SimpleSpore2Pickler"))
+    debug(s"T1: $t1tpe, T2: $t2tpe, R: $rtpe")
 
-    q"""
-      object $picklerName extends scala.pickling.Pickler[scala.spores.Spore2[$t1tpe, $t2tpe, $rtpe]] {
-        def tag =
-          implicitly[scala.pickling.FastTypeTag[scala.spores.Spore2[$t1tpe, $t2tpe, $rtpe]]]
+    val sporeType = tq"scala.spores.Spore2[$t1tpe, $t2tpe, $rtpe]"
+    genSimpleSporePicklerUnpicklerTemplate(c)("SimpleSpore2Pickler", sporeType)
 
-        def pickle(picklee: scala.spores.Spore2[$t1tpe, $t2tpe, $rtpe], builder: scala.pickling.PBuilder): Unit = {
-          builder.beginEntry(picklee, tag)
-
-          builder.putField("className", b => {
-            b.hintElidedType(scala.pickling.FastTypeTag.String)
-            scala.pickling.pickler.AllPicklers.stringPickler.pickle(picklee.className, b)
-          })
-
-          builder.endEntry()
-        }
-      }
-      $picklerName
-    """
   }
 
-  def genSimpleSpore3PicklerImpl[T1: c.WeakTypeTag, T2: c.WeakTypeTag, T3: c.WeakTypeTag, R: c.WeakTypeTag](c: Context): c.Tree = {
-
-    debug("Using genSimpleSpore3PicklerImpl")
+  def genSimpleSpore3PicklerImpl
+      [T1: c.WeakTypeTag, T2: c.WeakTypeTag, T3: c.WeakTypeTag, R: c.WeakTypeTag]
+      (c: Context): c.Tree = {
 
     import c.universe._
+
     val t1tpe = weakTypeOf[T1]
     val t2tpe = weakTypeOf[T2]
     val t3tpe = weakTypeOf[T3]
     val rtpe = weakTypeOf[R]
-    val picklerName = c.freshName(TermName("Spore3Pickler"))
+    debug(s"T1: $t1tpe, T2: $t2tpe, T3: $t3tpe, R: $rtpe")
 
-    q"""
-      object $picklerName extends scala.pickling.Pickler[scala.spores.Spore3[$t1tpe, $t2tpe, $t3tpe, $rtpe]] {
-        def tag =
-          implicitly[scala.pickling.FastTypeTag[scala.spores.Spore3[$t1tpe, $t2tpe, $t3tpe, $rtpe]]]
+    val sporeType = tq"scala.spores.Spore3[$t1tpe, $t2tpe, $t3tpe, $rtpe]"
+    genSimpleSporePicklerUnpicklerTemplate(c)("SimpleSpore3Pickler", sporeType)
 
-        def pickle(picklee: scala.spores.Spore3[$t1tpe, $t2tpe, $t3tpe, $rtpe], builder: scala.pickling.PBuilder): Unit = {
-          builder.beginEntry(picklee, tag)
-
-          builder.putField("className", b => {
-            b.hintElidedType(scala.pickling.FastTypeTag.String)
-            scala.pickling.pickler.AllPicklers.stringPickler.pickle(picklee.className, b)
-          })
-
-          builder.endEntry()
-        }
-      }
-      $picklerName
-    """
   }
 
 }
