@@ -80,6 +80,7 @@ trait SporePickler extends SimpleSporePicklerImpl {
         def pickle(picklee: $sporeType, builder: scala.pickling.PBuilder): Unit = {
 
           builder.beginEntry(picklee, tag)
+          builder.hintElidedType(tag)
           ${utils.writeUnpicklerClassName(builderName, picklerUnpicklerName)}
           ${utils.writeClassName(builderName, picklee)}
           ${utils.writeCaptured(builderName, picklee, capturedPickler, sporeType, utpe)}
@@ -285,6 +286,11 @@ object SporePickler extends SporePickler {
 
   /********************* PICKLERS ***********************/
 
+  /* `SporeWithEnv` has their own picklers and unpicklers and these unpicklers
+   * can be picked in the implicit search if we don't look them up for the
+   * subclass `Spore`. Otherwise, a `SporeWithEnv` can be disguised as a
+   * `Spore` and in those cases we use the general `Unpickler` defined below. */
+
   implicit def genSporePicklerUnpickler[T, R, U]
     (implicit cPickler: Pickler[U], cUnpickler: Unpickler[U]): FullPUE[T, R, U] =
       macro genSporePicklerUnpicklerImpl[T, R, U]
@@ -310,6 +316,10 @@ object SporePickler extends SporePickler {
       macro genSimpleSpore3PicklerImpl[T1, T2, T3, R]
 
   /********************* UNPICKLERS ***********************/
+
+  /* These `Unpickler`s are meant to serialize both `Spore`s and `SporeWitEnv`s.
+   * The subtyping relation between them forces us to have an intermediate
+   * `Unpickler` which will get the correct `Unpickler` for the actual spore type. */
 
   implicit def genSporeUnpickler[T, R]: FullU[T, R] =
     macro genSporeUnpicklerImpl[T, R]
