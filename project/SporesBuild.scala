@@ -92,6 +92,12 @@ object SporesBuild extends Build {
     settings = buildSettings ++ publishSettings
   )
 
+  lazy val sandbox = Project(
+    id = "sandbox",
+    base = file("sandbox"),
+    settings = buildSettings ++ Seq(scalacOptions in Compile ++= Seq("-Xprint:typer"))
+  ) dependsOn(core, pickling)
+
   lazy val pickling = Project(
     id = "spores-pickling",
     base = file("spores-pickling"),
