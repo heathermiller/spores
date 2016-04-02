@@ -15,6 +15,8 @@ import SporePickler._
 @RunWith(classOf[JUnit4])
 class PicklingSpec {
 
+  implicit val staticOnly = static.StaticOnly
+
   @Test
   def `pickle/unpickle to/from JSON with one captured variable`(): Unit = {
     val v1 = 10
@@ -71,7 +73,7 @@ class PicklingSpec {
   def `simple pickling of spore with two captured variables`(): Unit = {
     val v1 = 10
     val v2 = "hello2"
-    val s = spore {
+    val s: SporeWithEnv[Int, String] {type Captured = (Int, String)}= spore {
       val c1 = v1
       val c2 = v2
       (x: Int) => s"arg: $x, c1: $c1, c2: $c2"

@@ -20,10 +20,10 @@ trait SimpleSporePicklerImpl {
     import c.universe._
 
     val utils = new PicklerUtils[c.type](c)
-    val picklee = TermName("picklee")
-    val readerName = TermName("reader")
-    val builderName = TermName("builder")
-    val className = TermName("className")
+    val reader = c.freshName(TermName("reader"))
+    val builder = c.freshName(TermName("builder"))
+    val picklee = c.freshName(TermName("picklee"))
+    val className = c.freshName(TermName("className"))
     val picklerName = c.freshName(TermName(seedPicklerName))
 
     q"""
@@ -33,18 +33,19 @@ trait SimpleSporePicklerImpl {
 
         def tag = implicitly[scala.pickling.FastTypeTag[$sporeType]]
 
-        def pickle(picklee: $sporeType, builder: scala.pickling.PBuilder): Unit = {
+        def pickle($picklee: $sporeType, $builder: scala.pickling.PBuilder): Unit = {
 
-          builder.beginEntry(picklee, tag)
-          ${utils.writeClassName(builderName, picklee)}
-          ${utils.writeUnpicklerClassName(builderName, picklerName)}
-          builder.endEntry()
+          $builder.beginEntry($picklee, tag)
+          $builder.hintElidedType(tag)
+          ${utils.writeUnpicklerClassName(builder, picklerName)}
+          ${utils.writeClassName(builder, picklee)}
+          $builder.endEntry()
 
         }
 
-        def unpickle(tag: String, reader: scala.pickling.PReader): Any = {
+        def unpickle(tag: String, $reader: scala.pickling.PReader): Any = {
 
-          val className = ${utils.readClassName(readerName)}
+          val $className = ${utils.readClassName(reader)}
           ${utils.createInstance(className, sporeType)}
 
         }

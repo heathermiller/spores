@@ -9,7 +9,7 @@ object SporesBuild extends Build {
     organization := "org.scala-lang.modules",
     organizationName := "LAMP/EPFL",
     organizationHomepage := Some(new URL("http://lamp.epfl.ch")),
-    version      := "0.2.3-SNAPSHOT",
+    version      := "0.2.4-M1",
     scalaVersion := "2.11.7"
   )
 

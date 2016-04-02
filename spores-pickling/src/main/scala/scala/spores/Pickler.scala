@@ -52,21 +52,18 @@ trait SporePickler extends SimpleSporePicklerImpl {
     import c.universe._
 
     val utpe = weakTypeOf[U]
+    val utpeStr = utpe.toString
 
-    val unpickledCapture = c.freshName(TermName("capture"))
-    val unpickledSpore = c.freshName(TermName("spore"))
+    val reader = c.freshName(TermName("reader"))
+    val builder = c.freshName(TermName("builder"))
+    val picklee = c.freshName(TermName("picklee"))
     val className = c.freshName(TermName("className"))
+    val unpickledSpore = c.freshName(TermName("spore"))
+    val unpickledCapture = c.freshName(TermName("capture"))
     val capturedPickler = c.freshName(TermName("capturedPickler"))
     val capturedUnpickler = c.freshName(TermName("capturedUnpickler"))
     val picklerUnpicklerName = c.freshName(TermName("SporePicklerUnpickler"))
     val utils = new PicklerUtils[c.type](c)
-
-    /* These term names refer to the names of
-     * the variables inside Pickler/Unpickler */
-    val currentType = TermName("currentType")
-    val builderName = TermName("builder")
-    val readerName = TermName("reader")
-    val picklee = TermName("picklee")
 
     q"""
       val $capturedPickler = $cPickler
@@ -77,27 +74,29 @@ trait SporePickler extends SimpleSporePicklerImpl {
 
         def tag = implicitly[scala.pickling.FastTypeTag[$sporeType]]
 
-        def pickle(picklee: $sporeType, builder: scala.pickling.PBuilder): Unit = {
+        def pickle($picklee: $sporeType, $builder: scala.pickling.PBuilder): Unit = {
 
-          builder.beginEntry(picklee, tag)
-          builder.hintElidedType(tag)
-          ${utils.writeUnpicklerClassName(builderName, picklerUnpicklerName)}
-          ${utils.writeClassName(builderName, picklee)}
-          ${utils.writeCaptured(builderName, picklee, capturedPickler, sporeType, utpe)}
-          builder.endEntry()
+          $builder.beginEntry($picklee, tag)
+          $builder.hintElidedType(tag)
+          ${utils.writeUnpicklerClassName(builder, picklerUnpicklerName)}
+          ${utils.writeClassName(builder, picklee)}
+          ${utils.writeCaptured(builder, picklee, capturedPickler, sporeType, utpe)}
+          $builder.endEntry()
 
         }
 
-        def unpickle(tag: String, reader: scala.pickling.PReader): Any = {
+        def unpickle(tag: String, $reader: scala.pickling.PReader): Any = {
 
-          val $className = ${utils.readClassName(readerName)}
+          val $className = ${utils.readClassName(reader)}
           val $unpickledSpore = ${utils.createInstance(className, sporeType)}
 
           /* Ask for the unpickler at this point, since if we pass a var outside
            * this scope, the unpickler will be null. This is a safe operation
            * since such an `Unpickler` exists because we got it as an implicit */
+          
           val $capturedUnpickler = implicitly[scala.pickling.Unpickler[$utpe]]
-          val $unpickledCapture = ${utils.readCaptured(readerName, capturedUnpickler)}
+          if($capturedUnpickler == null) println("Unpickler[" + $utpeStr + "] is null")
+          val $unpickledCapture = ${utils.readCaptured(reader, capturedUnpickler)}
 
           ${utils.setCapturedInSpore(unpickledSpore, unpickledCapture)}
 
@@ -185,8 +184,8 @@ trait SporePickler extends SimpleSporePicklerImpl {
     import c.universe._
 
     val utils = new PicklerUtils[c.type](c)
+    val reader = c.freshName(TermName("reader"))
     val unpicklerType = tq"scala.pickling.Unpickler[$sporeType]"
-    val readerName = TermName("reader")
     val unpicklerName = c.freshName(TermName("UnpicklerFetcher"))
     val unpicklerClassName = TermName("unpicklerClassName")
 
@@ -195,13 +194,13 @@ trait SporePickler extends SimpleSporePicklerImpl {
 
         def tag = implicitly[scala.pickling.FastTypeTag[$sporeType]]
 
-        def unpickle(tag: String, reader: scala.pickling.PReader): Any = {
+        def unpickle(tag: String, $reader: scala.pickling.PReader): Any = {
 
-          val unpicklerClassName = ${utils.readUnpicklerClassName(readerName)}
+          val unpicklerClassName = ${utils.readUnpicklerClassName(reader)}
           debug("[genFetcherOfUnpickler] instantiate " + unpicklerClassName)
           val sporeUnpickler = ${utils.createInstance(unpicklerClassName, unpicklerType)}
 
-          sporeUnpickler.unpickle(tag, reader).asInstanceOf[$sporeType]
+          sporeUnpickler.unpickle(tag, $reader).asInstanceOf[$sporeType]
 
         }
       }

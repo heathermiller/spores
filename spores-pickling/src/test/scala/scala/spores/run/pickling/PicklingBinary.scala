@@ -33,6 +33,8 @@ class TestEmitter extends Emitter[String] {
 @RunWith(classOf[JUnit4])
 class PicklingBinarySpec {
 
+  implicit val staticOnly = static.StaticOnly
+
   @Test
   def `pickle/unpickle to/from binary`(): Unit = {
 
@@ -77,7 +79,7 @@ class PicklingBinarySpec {
   def testSpore2WithEnv(): Unit = {
 
     val maxSize = 20
-    val s = spore {
+    val s: Spore2WithEnv[(String, Int), Emitter[String], Unit] {type Captured = (Int, Int)} = spore {
         val chunkSize = maxSize / 2
         val chunkIndex = 0
         (elem: (String, Int), emit: Emitter[String]) =>

@@ -51,24 +51,33 @@ private[spores] class PicklerUtils[C <: Context with Singleton](val c: C) {
   }
 
   def createInstance(className: TermName, tpe: c.Tree): c.Tree = {
+
+    val clazz = c.freshName(TermName("clazz"))
+    val instance = c.freshName(TermName("instance"))
+
     q"""
-      val clazz = java.lang.Class.forName($className)
-      val instance = try (clazz.newInstance()) catch {
+      val $clazz = java.lang.Class.forName($className)
+      val $instance = try ($clazz.newInstance()) catch {
         case t: Throwable =>
           scala.concurrent.util.Unsafe.instance
-            .allocateInstance(clazz)
+            .allocateInstance($clazz)
       }
 
-      instance.asInstanceOf[$tpe]
+      $instance.asInstanceOf[$tpe]
     """
+
   }
 
   def setCapturedInSpore(spore: TermName, captured: TermName): c.Tree = {
+
+    val capturedValField = c.freshName(TermName("capturedValField"))
+
     q"""
-      val capturedValField = $spore.getClass.getDeclaredField("captured")
-      capturedValField.setAccessible(true)
-      capturedValField.set($spore, $captured.asInstanceOf[$spore.Captured])
+      val $capturedValField = $spore.getClass.getDeclaredField($capturedField)
+      $capturedValField.setAccessible(true)
+      $capturedValField.set($spore, $captured.asInstanceOf[$spore.Captured])
     """
+
   }
 
   def readClassName(reader: TermName): c.Tree = {
