@@ -25,13 +25,14 @@ trait SimpleSporePicklerImpl {
     val picklee = c.freshName(TermName("picklee"))
     val className = c.freshName(TermName("className"))
     val picklerName = c.freshName(TermName(seedPicklerName))
-    import utils.{picklerType, unpicklerType, pbuilderType, preaderType}
+    import utils.{picklerType, unpicklerType, pbuilderType, preaderType, autoRegisterType}
     import utils.{fastTypeTagType, stringType, anyType, unitType, locallyPath}
 
     q"""
       $locallyPath {
         implicit object $picklerName
-            extends $picklerType[$sporeType] with $unpicklerType[$sporeType] {
+            extends $picklerType[$sporeType] with $unpicklerType[$sporeType]
+              with $autoRegisterType[$sporeType] {
 
           def tag = implicitly[$fastTypeTagType[$sporeType]]
 

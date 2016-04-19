@@ -27,6 +27,8 @@ private[spores] class PicklerUtils[C <: Context with Singleton](val c: C) {
   private[spores] val pbuilderType = tq"$picklingPath.PBuilder"
   private[spores] val preaderType = tq"$picklingPath.PReader"
   private[spores] val fastTypeTagType = tq"$picklingPath.FastTypeTag"
+  private[spores] val autoRegisterType = tq"$picklingPath.AutoRegister"
+  private[spores] val autoRegisterUnpicklerType = tq"$picklingPath.AutoRegisterUnpickler"
 
   private val capturedField = "captured"
   private val classNameField = "className"
