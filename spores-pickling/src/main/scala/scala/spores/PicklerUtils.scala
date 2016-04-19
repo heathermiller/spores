@@ -14,9 +14,23 @@ private[spores] class PicklerUtils[C <: Context with Singleton](val c: C) {
 
   import c.universe._
 
-  final val capturedField = "captured"
-  final val classNameField = "className"
-  final val unpicklerClassNameField = "unpicklerClassName"
+  private[spores] val scalaPath = q"_root_.scala"
+  private[spores] val anyType = tq"$scalaPath.Any"
+  private[spores] val unitType = tq"$scalaPath.Unit"
+  private[spores] val sporesPath = q"$scalaPath.spores"
+  private[spores] val predefPath = q"$scalaPath.Predef"
+  private[spores] val stringType = tq"$predefPath.String"
+  private[spores] val locallyPath = q"$predefPath.locally"
+  private[spores] val picklingPath = q"$scalaPath.pickling"
+  private[spores] val picklerType = tq"$picklingPath.Pickler"
+  private[spores] val unpicklerType = tq"$picklingPath.Unpickler"
+  private[spores] val pbuilderType = tq"$picklingPath.PBuilder"
+  private[spores] val preaderType = tq"$picklingPath.PReader"
+  private[spores] val fastTypeTagType = tq"$picklingPath.FastTypeTag"
+
+  private val capturedField = "captured"
+  private val classNameField = "className"
+  private val unpicklerClassNameField = "unpicklerClassName"
 
   // Keep it in the scope so that quasiquotes access it
   import scala.pickling.pickler.AllPicklers.stringPickler
@@ -83,7 +97,7 @@ private[spores] class PicklerUtils[C <: Context with Singleton](val c: C) {
   def readClassName(reader: TermName): c.Tree = {
 
     val unpickler = q"stringPickler"
-    val elidedType = q"scala.pickling.FastTypeTag.String"
+    val elidedType = q"$scalaPath.pickling.FastTypeTag.String"
 
     val value = readTemplate(reader, classNameField, elidedType, unpickler)
     q"$value.asInstanceOf[String]"
@@ -94,7 +108,7 @@ private[spores] class PicklerUtils[C <: Context with Singleton](val c: C) {
 
     val pickler = q"stringPickler"
     val toPickle = q"$picklee.className"
-    val elidedType = q"scala.pickling.FastTypeTag.String"
+    val elidedType = q"$scalaPath.pickling.FastTypeTag.String"
 
     writeTemplate(builder, classNameField, toPickle, elidedType, pickler)
 
@@ -124,7 +138,7 @@ private[spores] class PicklerUtils[C <: Context with Singleton](val c: C) {
   def readUnpicklerClassName(reader: TermName): c.Tree = {
 
     val unpickler = q"stringPickler"
-    val elidedType = q"scala.pickling.FastTypeTag.String"
+    val elidedType = q"$scalaPath.pickling.FastTypeTag.String"
 
     val value = readTemplate(reader, unpicklerClassNameField, elidedType, unpickler)
     q"$value.asInstanceOf[String]"
@@ -135,7 +149,7 @@ private[spores] class PicklerUtils[C <: Context with Singleton](val c: C) {
 
     val pickler = q"stringPickler"
     val toPickle = q"$unpickler.getClass.getName"
-    val elidedType = q"scala.pickling.FastTypeTag.String"
+    val elidedType = q"$scalaPath.pickling.FastTypeTag.String"
 
     writeTemplate(builder, unpicklerClassNameField, toPickle, elidedType, pickler)
 
