@@ -10,7 +10,7 @@ import scala.pickling._
 import Defaults._
 import binary._
 
-import SporePickler._
+import SporePicklers._
 
 trait Emitter[T] {
   def emit(v: T)(implicit pickler: Pickler[T], unpickler: Unpickler[T]): Unit

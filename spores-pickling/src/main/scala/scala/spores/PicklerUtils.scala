@@ -1,13 +1,14 @@
 /*                     __                                               *\
-**     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2002-2013, LAMP/EPFL             **
-**  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
-** /____/\___/_/ |_/____/_/ | |                                         **
-**                          |/                                          **
+ **     ________ ___   / /  ___     Scala API                            **
+ **    / __/ __// _ | / /  / _ |    (c) 2002-2013, LAMP/EPFL             **
+ **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
+ ** /____/\___/_/ |_/____/_/ | |                                         **
+ **                          |/                                          **
 \*                                                                      */
 
 package scala.spores
 
+import scala.pickling.FastTypeTag
 import scala.reflect.macros.blackbox.Context
 
 private[spores] class PicklerUtils[C <: Context with Singleton](val c: C) {
@@ -34,10 +35,13 @@ private[spores] class PicklerUtils[C <: Context with Singleton](val c: C) {
   private val classNameField = "className"
   private val unpicklerClassNameField = "unpicklerClassName"
 
-  // Keep it in the scope so that quasiquotes access it
-  import scala.pickling.pickler.AllPicklers.stringPickler
+  private val strTag = q"$picklingPath.FastTypeTag.String"
+  private val strPicklerUnpickler = q"$picklingPath.pickler.AllPicklers.stringPickler"
 
-  def readTemplate(reader: TermName, field: String, elidedType: c.Tree, unpickler: c.Tree): c.Tree = {
+  def readTemplate(reader: TermName,
+                   field: String,
+                   elidedType: c.Tree,
+                   unpickler: c.Tree): c.Tree = {
 
     val tag = c.freshName(TermName("tag"))
     val reader1 = c.freshName(TermName("reader1"))
@@ -45,25 +49,28 @@ private[spores] class PicklerUtils[C <: Context with Singleton](val c: C) {
 
     q"""
       val $reader1 = $reader.readField($field)
-      $reader1.hintElidedType($elidedType)
+      // Runtime picklers need the type, don't elide it
+      // reader1.hintElidedType(elidedType)
       val $tag = $reader1.beginEntry()
       val $result = $unpickler.unpickle($tag, $reader1)
       $reader1.endEntry()
       $result
     """
-
   }
 
-  def writeTemplate(builder: TermName, field: String, picklee: c.Tree,
-      elidedType: c.Tree, pickler: c.Tree): c.Tree = {
+  def writeTemplate(builder: TermName,
+                    field: String,
+                    picklee: c.Tree,
+                    elidedType: c.Tree,
+                    pickler: c.Tree): c.Tree = {
 
     q"""
       $builder.putField($field, b => {
-        b.hintElidedType($elidedType)
+        // Runtime picklers need the type, don't elide it
+        // b.hintElidedType(elidedType)
         $pickler.pickle($picklee, b)
       })
     """
-
   }
 
   def createInstance(className: TermName, tpe: c.Tree): c.Tree = {
@@ -81,7 +88,6 @@ private[spores] class PicklerUtils[C <: Context with Singleton](val c: C) {
 
       $instance.asInstanceOf[$tpe]
     """
-
   }
 
   def setCapturedInSpore(spore: TermName, captured: TermName): c.Tree = {
@@ -93,27 +99,19 @@ private[spores] class PicklerUtils[C <: Context with Singleton](val c: C) {
       $capturedValField.setAccessible(true)
       $capturedValField.set($spore, $captured.asInstanceOf[$spore.Captured])
     """
-
   }
 
   def readClassName(reader: TermName): c.Tree = {
 
-    val unpickler = q"stringPickler"
-    val elidedType = q"$scalaPath.pickling.FastTypeTag.String"
-
-    val value = readTemplate(reader, classNameField, elidedType, unpickler)
+    val value = readTemplate(
+        reader, classNameField, strTag, strPicklerUnpickler)
     q"$value.asInstanceOf[String]"
-
   }
 
   def writeClassName(builder: TermName, picklee: TermName): c.Tree = {
 
-    val pickler = q"stringPickler"
-    val toPickle = q"$picklee.className"
-    val elidedType = q"$scalaPath.pickling.FastTypeTag.String"
-
-    writeTemplate(builder, classNameField, toPickle, elidedType, pickler)
-
+    val target = q"$picklee.className"
+    writeTemplate(builder, classNameField, target, strTag, strPicklerUnpickler)
   }
 
   def readCaptured(reader: TermName, capturedUnpickler: TermName): c.Tree = {
@@ -122,39 +120,32 @@ private[spores] class PicklerUtils[C <: Context with Singleton](val c: C) {
     val elidedType = q"$capturedUnpickler.tag"
 
     readTemplate(reader, capturedField, elidedType, unpickler)
-
   }
 
-  def writeCaptured(builder: TermName, picklee: TermName, capturedPickler: TermName,
-                    tpe: c.Tree, utpe: Type): c.Tree = {
+  def writeCaptured(builder: TermName,
+                    picklee: TermName,
+                    capturedPickler: TermName,
+                    tpe: c.Tree,
+                    utpe: Type): c.Tree = {
 
     val pickler = q"$capturedPickler"
     val elidedType = q"$capturedPickler.tag"
-    val toPickle = q"$picklee.asInstanceOf[$tpe].captured.asInstanceOf[$utpe]"
+    val target = q"$picklee.asInstanceOf[$tpe].captured.asInstanceOf[$utpe]"
 
-    writeTemplate(builder, capturedField, toPickle, elidedType, pickler)
-
+    writeTemplate(builder, capturedField, target, elidedType, pickler)
   }
-
 
   def readUnpicklerClassName(reader: TermName): c.Tree = {
 
-    val unpickler = q"stringPickler"
-    val elidedType = q"$scalaPath.pickling.FastTypeTag.String"
-
-    val value = readTemplate(reader, unpicklerClassNameField, elidedType, unpickler)
+    val value = readTemplate(
+        reader, unpicklerClassNameField, strTag, strPicklerUnpickler)
     q"$value.asInstanceOf[String]"
-
   }
 
   def writeUnpicklerClassName(builder: TermName, unpickler: TermName): c.Tree = {
 
-    val pickler = q"stringPickler"
-    val toPickle = q"$unpickler.getClass.getName"
-    val elidedType = q"$scalaPath.pickling.FastTypeTag.String"
-
-    writeTemplate(builder, unpicklerClassNameField, toPickle, elidedType, pickler)
-
+    val target = q"$unpickler.getClass.getName"
+    writeTemplate(builder,
+      unpicklerClassNameField, target, strTag, strPicklerUnpickler)
   }
-
 }

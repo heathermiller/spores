@@ -9,8 +9,9 @@ import org.junit.runners.JUnit4
 import scala.pickling._
 import Defaults._
 import json._
+import static._
 
-import SporePickler._
+import SporePicklers._
 
 @RunWith(classOf[JUnit4])
 class Issue15Spec {
@@ -23,11 +24,16 @@ class Issue15Spec {
     }
 
     val d = s.pickle
+    System.out.println(d.value.toString)
     assert(d.value.toString.endsWith("""
-      |  "captured": "hello"
+      |  "captured": {
+      |    "$type": "java.lang.String",
+      |    "value": "hello"
+      |  }
       |}""".stripMargin))
 
     val us = d.unpickle[Spore[List[Int], List[String]]]
     assert(us(List(1, 2, 3)).toString == "List(hello 1, hello 2, hello 3)")
   }
+
 }

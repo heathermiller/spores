@@ -13,7 +13,7 @@ import scala.pickling._
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox.Context
 
-trait SporePickler extends SimpleSporePicklerImpl {
+trait SporePicklers extends SimpleSporePicklers {
 
   /** The current implementation doesn't really use this method but
     * there can be corner cases or future bugs that could be fixed
@@ -41,7 +41,7 @@ trait SporePickler extends SimpleSporePicklerImpl {
 
 
   /** Generates both `Pickler`s and `Unpickler`s for `Spore`s and `SporeWithEnv`s.
-    * 
+    *
     * The `Pickler`s will be used by default and the `Unpickler`s will be invoked
     * by the `UnpicklerFetcher` defined below. Fortunately, we don't have to keep
     * type information of `Captured` in the pickled message since we already know
@@ -81,7 +81,8 @@ trait SporePickler extends SimpleSporePicklerImpl {
           def pickle($picklee: $sporeType, $builder: $pbuilderType): $unitType = {
 
             $builder.beginEntry($picklee, tag)
-            $builder.hintElidedType(tag)
+            // Runtime picklers need the type, don't elide it
+            // builder.hintElidedType(tag)
             ${utils.writeUnpicklerClassName(builder, picklerUnpicklerName)}
             ${utils.writeClassName(builder, picklee)}
             ${utils.writeCaptured(builder, picklee, capturedPickler, sporeType, utpe)}
@@ -278,7 +279,7 @@ trait SporePickler extends SimpleSporePicklerImpl {
 
 }
 
-object SporePickler extends SporePickler {
+object SporePicklers extends SporePicklers {
 
   /* Unify type for returning both a pickler and unpickler
    * that keeps track of the captured type inside a `Spore` */

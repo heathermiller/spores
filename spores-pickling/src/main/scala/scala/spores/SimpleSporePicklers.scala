@@ -8,11 +8,10 @@
 
 package scala.spores
 
+import scala.pickling._
 import scala.reflect.macros.blackbox.Context
 
-import scala.pickling._
-
-trait SimpleSporePicklerImpl {
+trait SimpleSporePicklers {
 
   def genSimpleSporePicklerUnpicklerTemplate(c: Context)
     (seedPicklerName: String, sporeType: c.Tree): c.Tree = {
@@ -39,7 +38,8 @@ trait SimpleSporePicklerImpl {
           def pickle($picklee: $sporeType, $builder: $pbuilderType): $unitType = {
 
             $builder.beginEntry($picklee, tag)
-            $builder.hintElidedType(tag)
+            // Runtime picklers need the type, don't elide it
+            // builder.hintElidedType(tag)
             ${utils.writeUnpicklerClassName(builder, picklerName)}
             ${utils.writeClassName(builder, picklee)}
             $builder.endEntry()
@@ -57,7 +57,6 @@ trait SimpleSporePicklerImpl {
         $picklerName
       }
     """
-
 
   }
 

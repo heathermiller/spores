@@ -10,7 +10,7 @@ import scala.pickling._
 import Defaults._
 import json._
 
-import SporePickler._
+import SporePicklers._
 
 @RunWith(classOf[JUnit4])
 class PicklingSpec {
@@ -26,8 +26,12 @@ class PicklingSpec {
     }
 
     val res = s.pickle
+    println(res.value)
     assert(res.value.toString.endsWith("""
-      |  "captured": 10
+      |  "captured": {
+      |    "$type": "scala.Int",
+      |    "value": 10
+      |  }
       |}""".stripMargin))
 
     val up = res.value.unpickle[Spore[Int, String]]
@@ -45,7 +49,7 @@ class PicklingSpec {
       (x: Int) => s"arg: $x, c1: $c1, c2: $c2"
     }
 
-    val pickler = SporePickler.genSporePicklerUnpickler[Int, String, (Int, String)]
+    val pickler = SporePicklers.genSporePicklerUnpickler[Int, String, (Int, String)]
   
     val format  = implicitly[PickleFormat]
     val builder = format.createBuilder
@@ -55,14 +59,16 @@ class PicklingSpec {
     }
 
     System.out.println(s"res1: ${res.value}")
-    assert(res.value.toString.endsWith(""""captured": {
+    assert(res.value.toString.endsWith("""
+      |  "captured": {
+      |    "$type": "scala.Tuple2[scala.Int,java.lang.String]",
       |    "_1": 10,
       |    "_2": "hello1"
       |  }
       |}""".stripMargin))
 
     val reader = format.createReader(res.asInstanceOf[format.PickleType])
-    val unpickler = SporePickler.genSporeUnpickler[Int, String]
+    val unpickler = SporePicklers.genSporeUnpickler[Int, String]
     val up = unpickler.unpickle("", reader).asInstanceOf[Spore[Int, String]]
     val res2 = up(5)
     System.out.println(s"res2: ${res2.value}")
