@@ -25,8 +25,10 @@ private[spores] class PicklerUtils[C <: Context with Singleton](val c: C) {
   private[spores] val picklingPath = q"$scalaPath.pickling"
   private[spores] val picklerType = tq"$picklingPath.Pickler"
   private[spores] val unpicklerType = tq"$picklingPath.Unpickler"
+  private[spores] val absPicklerUnpicklerType = tq"$picklingPath.AbstractPicklerUnpickler"
   private[spores] val pbuilderType = tq"$picklingPath.PBuilder"
   private[spores] val preaderType = tq"$picklingPath.PReader"
+  private[spores] val fastTypeTagPath = q"$picklingPath.FastTypeTag"
   private[spores] val fastTypeTagType = tq"$picklingPath.FastTypeTag"
   private[spores] val autoRegisterType = tq"$picklingPath.AutoRegister"
   private[spores] val autoRegisterUnpicklerType = tq"$picklingPath.AutoRegisterUnpickler"
@@ -35,7 +37,7 @@ private[spores] class PicklerUtils[C <: Context with Singleton](val c: C) {
   private val classNameField = "className"
   private val unpicklerClassNameField = "unpicklerClassName"
 
-  private val strTag = q"$picklingPath.FastTypeTag.String"
+  private val strTag = q"$fastTypeTagPath.String"
   private val strPicklerUnpickler = q"$picklingPath.pickler.AllPicklers.stringPickler"
 
   def readTemplate(reader: TermName,
@@ -90,14 +92,14 @@ private[spores] class PicklerUtils[C <: Context with Singleton](val c: C) {
     """
   }
 
-  def setCapturedInSpore(spore: TermName, captured: TermName): c.Tree = {
+  def setCapturedInSpore(spore: TermName, captured: TermName, capturedTpe: Type): c.Tree = {
 
     val capturedValField = c.freshName(TermName("capturedValField"))
 
     q"""
       val $capturedValField = $spore.getClass.getDeclaredField($capturedField)
       $capturedValField.setAccessible(true)
-      $capturedValField.set($spore, $captured.asInstanceOf[$spore.Captured])
+      $capturedValField.set($spore, $captured.asInstanceOf[$capturedTpe])
     """
   }
 

@@ -79,7 +79,7 @@ class PicklingBinarySpec {
   def testSpore2WithEnv(): Unit = {
 
     val maxSize = 20
-    val s: Spore2WithEnv[(String, Int), Emitter[String], Unit] {type Captured = (Int, Int)} = spore {
+    val s = spore {
         val chunkSize = maxSize / 2
         val chunkIndex = 0
         (elem: (String, Int), emit: Emitter[String]) =>

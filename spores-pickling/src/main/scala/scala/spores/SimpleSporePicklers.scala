@@ -33,9 +33,9 @@ trait SimpleSporePicklers {
             extends $picklerType[$sporeType] with $unpicklerType[$sporeType]
               with $autoRegisterType[$sporeType] {
 
-          def tag = implicitly[$fastTypeTagType[$sporeType]]
+          override def tag = implicitly[$fastTypeTagType[$sporeType]]
 
-          def pickle($picklee: $sporeType, $builder: $pbuilderType): $unitType = {
+          override def pickle($picklee: $sporeType, $builder: $pbuilderType): $unitType = {
 
             $builder.beginEntry($picklee, tag)
             // Runtime picklers need the type, don't elide it
@@ -46,7 +46,7 @@ trait SimpleSporePicklers {
 
           }
 
-          def unpickle(tag: $stringType, $reader: $preaderType): $anyType = {
+          override def unpickle(tag: $stringType, $reader: $preaderType): $anyType = {
 
             val $className = ${utils.readClassName(reader)}
             ${utils.createInstance(className, sporeType)}
