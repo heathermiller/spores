@@ -77,18 +77,10 @@ private[spores] class PicklerUtils[C <: Context with Singleton](val c: C) {
 
   def createInstance(className: TermName, tpe: c.Tree): c.Tree = {
 
-    val clazz = c.freshName(TermName("clazz"))
-    val instance = c.freshName(TermName("instance"))
+    val finalTpe = tq"$tpe"
 
     q"""
-      val $clazz = java.lang.Class.forName($className)
-      val $instance = try ($clazz.newInstance()) catch {
-        case t: Throwable =>
-          scala.concurrent.util.Unsafe.instance
-            .allocateInstance($clazz)
-      }
-
-      $instance.asInstanceOf[$tpe]
+      $sporesPath.ReflectionUtils.createInstance[$finalTpe]($className)
     """
   }
 
