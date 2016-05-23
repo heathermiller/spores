@@ -14,6 +14,10 @@ import scala.reflect.macros.whitebox.Context
 private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
   import c.universe._
 
+  /* Don't change this name since it's used
+   * to check if a class is indeed a spore */
+  val anonSporeName = TypeName("anonspore")
+
   /* Checks whether the owner chain of `sym` contains `owner`.
    *
    * @param sym   the symbol to be checked
@@ -238,7 +242,7 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
       mkApplyDefDef(nfBody)
     }
 
-    val sporeClassName = c.freshName(TypeName("anonspore"))
+    val sporeClassName = c.freshName(anonSporeName)
 
     if (validEnv.isEmpty) {
       // replace references to paramSyms with references to applyParamSymbols
@@ -340,7 +344,7 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
 
     val applyName = TermName("apply")
     val symtable = c.universe.asInstanceOf[scala.reflect.internal.SymbolTable]
-    val sporeClassName = c.freshName(TypeName("anonspore"))
+    val sporeClassName = c.freshName(anonSporeName)
 
     if (validEnv.isEmpty) {
       val newFunBody = c.untypecheck(funBody)
@@ -539,7 +543,7 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
       val applyName = TermName("apply")
 
       val applyParamValDef = ValDef(Modifiers(Flag.PARAM), applyParamName, TypeTree(paramSym.typeSignature), EmptyTree)
-      val sporeClassName = c.freshName(TypeName("anonspore"))
+      val sporeClassName = c.freshName(anonSporeName)
 
       if (validEnv.isEmpty) {
         val newFunBody = transformTypes(Map(paramSym -> id)) (funBody)

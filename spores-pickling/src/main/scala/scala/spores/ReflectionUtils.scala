@@ -13,11 +13,19 @@ private[spores] object ReflectionUtils {
   def createInstance[T](className: String): T = {
 
     val clazz = java.lang.Class.forName(className)
-    val instance = try (clazz.newInstance()) catch {
+    val instance = try clazz.newInstance() catch {
       case t: Throwable =>
         scala.concurrent.util.Unsafe.instance
           .allocateInstance(clazz)
     }
+
+    // Work around _className being null in any spore
+    if (clazz.getSimpleName.contains("anonspore")) {
+      val classNameField = clazz.getDeclaredField("_className")
+      classNameField.setAccessible(true)
+      classNameField.set(instance, className)
+    }
+
     instance.asInstanceOf[T]
 
   }

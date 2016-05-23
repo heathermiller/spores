@@ -51,8 +51,7 @@ trait Spore[-T, +R] extends Function1[T, R] {
   def className: String =
     _className
 
-  protected[this] var _className: String =
-    null
+  protected[this] var _className: String = null
 }
 
 trait SporeWithEnv[-T, +R] extends Spore[T, R] {

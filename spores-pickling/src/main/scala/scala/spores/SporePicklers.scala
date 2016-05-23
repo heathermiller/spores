@@ -53,9 +53,7 @@ trait SporePicklers extends SimpleSporePicklers {
     import c.universe._
 
     val utpe = weakTypeOf[U].dealias
-    val utpeStr = utpe.toString
-    debug(s"HEY U: $utpe")
-
+    debug(s"Captured type is: $utpe")
 
     val reader = c.freshName(TermName("reader"))
     val builder = c.freshName(TermName("builder"))
@@ -104,11 +102,11 @@ trait SporePicklers extends SimpleSporePicklers {
              * this scope, the unpickler will be null. This is a safe operation
              * since such an `Unpickler` exists because we got it as an implicit */
 
-            val $capturedUnpickler = implicitly[$unpicklerType[${utpe.dealias}]]
-            if($capturedUnpickler == null) println("Unpickler[" + $utpeStr + "] is null")
+            val $capturedUnpickler = implicitly[$unpicklerType[$utpe]]
+            if($capturedUnpickler == null) println("Unpickler[" + ${utpe.toString} + "] is null")
             val $unpickledCapture = ${utils.readCaptured(reader, capturedUnpickler)}
 
-            ${utils.setCapturedInSpore(unpickledSpore, unpickledCapture, utpe.dealias)}
+            ${utils.setCapturedInSpore(unpickledSpore, unpickledCapture, utpe)}
 
             $unpickledSpore
 
@@ -366,8 +364,11 @@ object SporePicklers extends SporePicklers
 
   /********************** Runtime picklers and unpicklers *********************/
 
-  locally {
+  def registerRuntimePickler = 
     registerPicklerAsGen(SporeRuntimePicklerUnpickler)
+
+  locally {
+    registerRuntimePickler
   }
 
 }
