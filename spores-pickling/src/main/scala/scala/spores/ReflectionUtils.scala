@@ -8,7 +8,10 @@
 
 package scala.spores
 
-private[spores] object ReflectionUtils {
+/** Helper method to deal with the Java reflection.
+  *
+  * It is public because macros access it outside the spores package. */
+object ReflectionUtils {
 
   def createInstance[T](className: String): T = {
 

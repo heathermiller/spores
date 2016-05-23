@@ -218,9 +218,7 @@ trait SporePicklers extends SimpleSporePicklers {
           def unpickle(tag: $stringType, $reader: $preaderType): $anyType = {
 
             val unpicklerClassName = ${utils.readUnpicklerClassName(reader)}
-            debug("[genFetcherOfUnpickler] instantiate " + unpicklerClassName)
             val sporeUnpickler = ${utils.createInstance(unpicklerClassName, unpicklerTpe)}
-
             sporeUnpickler.unpickle(tag, $reader).asInstanceOf[$sporeType]
 
           }
