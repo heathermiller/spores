@@ -253,6 +253,7 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
         q"""
           class $sporeClassName extends scala.spores.Spore2[${tpes(1)}, ${tpes(2)}, ${tpes(0)}] {
             self =>
+            type Captured = scala.Nothing
             this._className = this.getClass.getName
             $applyDefDef
           }
@@ -262,6 +263,7 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
         q"""
           class $sporeClassName extends scala.spores.Spore3[${tpes(1)}, ${tpes(2)}, ${tpes(3)}, ${tpes(0)}] {
             self =>
+            type Captured = scala.Nothing
             this._className = this.getClass.getName
             $applyDefDef
           }
@@ -557,6 +559,7 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
         q"""
           class $sporeClassName extends scala.spores.Spore[$ttpe, $rtpe] {
             self =>
+            type Captured = scala.Nothing
             this._className = this.getClass.getName
             $applyDefDef
           }

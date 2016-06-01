@@ -262,6 +262,26 @@ class BasicSpec {
     }
   }
 
+  @Test
+  def sporeCapturedNothing(): Unit = {
+    val a: Spore[Int, Unit] { type Captured = Nothing } = spore {
+      (i: Int) => println(s"Got $i")
+    }
+  }
+
+  @Test
+  def spore2CapturedNothing(): Unit = {
+    val a: Spore2[Int, Int, Unit] { type Captured = Nothing } = spore {
+      (x: Int, y: Int) => println(s"Got $x and $y")
+    }
+  }
+
+  @Test
+  def spore3CapturedNothing(): Unit = {
+    val a: Spore3[Int, Int, Int, Unit] { type Captured = Nothing } = spore {
+      (x: Int, y: Int, z: Int) => println(s"Got $x, $y and $z")
+    }
+  }
 
 }
 
