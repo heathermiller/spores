@@ -38,6 +38,8 @@ class TestEmitter extends Emitter[String] {
 @RunWith(classOf[JUnit4])
 class PicklingBinarySpec {
 
+  import static._
+
   @Test
   def `pickle/unpickle to/from binary`(): Unit = {
 
