@@ -7,17 +7,14 @@
 \*                                                                      */
 
 package scala.spores
-package run
-package pickling
 
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
 
+import scala.pickling.Defaults._
 import scala.pickling._
-import Defaults._
-import binary._
-
+import scala.pickling.binary._
 import SporePicklers._
 
 trait Emitter[T] {
@@ -40,8 +37,6 @@ class TestEmitter extends Emitter[String] {
 
 @RunWith(classOf[JUnit4])
 class PicklingBinarySpec {
-
-  implicit val staticOnly = static.StaticOnly
 
   @Test
   def `pickle/unpickle to/from binary`(): Unit = {
@@ -79,6 +74,16 @@ class PicklingBinarySpec {
     val s: Spore[Int, Int] = spore { (x: Int) => x + 1 }
     val p = s.pickle
     val s2 = p.unpickle[Spore[Int, Int]]
+    assert(s2(10) == 11)
+
+  }
+
+  @Test
+  def testSimpleSporeWithCapturedNothing(): Unit = {
+
+    val s = spore { (x: Int) => x + 1 }
+    val p = s.pickle
+    val s2 = p.unpickle[Spore[Int, Int] {type Captured = Nothing}]
     assert(s2(10) == 11)
 
   }

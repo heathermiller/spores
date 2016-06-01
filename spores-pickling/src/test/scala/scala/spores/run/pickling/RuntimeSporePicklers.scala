@@ -7,18 +7,16 @@
 \*                                                                      */
 
 package scala.spores
-package runtime
 
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
 
+import scala.pickling.Defaults._
 import scala.pickling._
-import Defaults._
-import json._
-import static._
-import SporePicklers._
+import scala.pickling.json._
 import scala.pickling.pickler.AnyPicklerUnpickler
+import SporePicklers._
 
 @RunWith(classOf[JUnit4])
 class RuntimeSporePicklers {
@@ -27,32 +25,6 @@ class RuntimeSporePicklers {
     s"arg: $x, c1: World"
   }
   val pickled = s.pickle
-
-  @Test
-  def `unpickle a spore using AnyPicklerUnpickler`() = {
-
-    // Unpickle using reflection, yay!
-    val r1 = pickleFormat.createReader(pickled)
-    val s2 = AnyPicklerUnpickler
-      .unpickle("scala.spores.Spore[scala.Int,java.lang.String]", r1)
-      .asInstanceOf[Spore[Int, String]]
-
-    // Only test same behaviour, not same instance
-    val n = scala.util.Random.nextInt()
-    assert(s(n) == s2(n))
-  }
-
-  @Test
-  def `pickle a spore as Spore[Any,Any]`() = {
-
-    // Pickle using reflection, yay!
-    val pickled2 = s.asInstanceOf[Spore[Any, Any]].pickle
-    val s2 = pickled2.unpickle[Spore[Int, String]]
-
-    // Only test same behaviour, not same instance
-    val n = scala.util.Random.nextInt()
-    assert(s(n) == s2(n))
-  }
 
   @Test
   def `pickle a spore as Any`() = {
@@ -72,4 +44,31 @@ class RuntimeSporePicklers {
     val n = scala.util.Random.nextInt()
     assert(s(n) == s2(n))
   }
+
+  @Test
+  def `unpickle a spore as Any`() = {
+
+    // Unpickle using reflection, yay!
+    val r1 = pickleFormat.createReader(pickled)
+    val s2 = AnyPicklerUnpickler
+      .unpickle("scala.spores.Spore[scala.Int,java.lang.String]", r1)
+      .asInstanceOf[Spore[Int, String]]
+
+    // Only test same behaviour, not same instance
+    val n = scala.util.Random.nextInt()
+    assert(s(n) == s2(n))
+  }
+
+  @Test
+  def `pickle/unpickle a spore as Spore[Any,Any]`() = {
+
+    // Pickle using reflection, yay!
+    val pickled2 = s.asInstanceOf[Spore[Any, Any]].pickle
+    val s2 = pickled2.unpickle[Spore[Any, Any]]
+
+    // Only test same behaviour, not same instance
+    val n = scala.util.Random.nextInt()
+    assert(s(n) == s2(n))
+  }
+
 }

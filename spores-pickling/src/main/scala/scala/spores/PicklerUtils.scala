@@ -22,6 +22,7 @@ private[spores] class PicklerUtils[C <: Context with Singleton](val c: C) {
   private[spores] val predefPath = q"$scalaPath.Predef"
   private[spores] val stringType = tq"$predefPath.String"
   private[spores] val locallyPath = q"$predefPath.locally"
+  private[spores] val nothingType = tq"$scalaPath.Nothing"
   private[spores] val picklingPath = q"$scalaPath.pickling"
   private[spores] val picklerType = tq"$picklingPath.Pickler"
   private[spores] val unpicklerType = tq"$picklingPath.Unpickler"
@@ -39,6 +40,10 @@ private[spores] class PicklerUtils[C <: Context with Singleton](val c: C) {
 
   private val strTag = q"$fastTypeTagPath.String"
   private val strPicklerUnpickler = q"$picklingPath.pickler.AllPicklers.stringPickler"
+
+  private[spores] val NothingType = typeOf[Nothing]
+
+  def isNothing(tpe: Type) = tpe =:= NothingType
 
   def readTemplate(reader: TermName,
                    field: String,

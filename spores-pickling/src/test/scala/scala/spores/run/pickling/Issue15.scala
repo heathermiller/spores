@@ -7,18 +7,13 @@
 \*                                                                      */
 
 package scala.spores
-package run
-package pickling
 
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
 
-import scala.pickling._
-import Defaults._
-import json._
-import static._
-
+import scala.pickling.Defaults._
+import scala.pickling.json._
 import SporePicklers._
 
 @RunWith(classOf[JUnit4])

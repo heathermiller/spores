@@ -21,7 +21,7 @@ private[spores] trait SporeRuntimePicklers extends GeneratorHelper {
     override def pickle(picklee: Spore[Any, Any], builder: PBuilder): Unit = {
       builder.beginEntry(picklee, tag)
       builder.putField("unpicklerClassName", b => {
-        stringPickler.pickle(AnyPicklerUnpickler.getClass.getName, b)
+        stringPickler.pickle(this.getClass.getName, b)
       })
       builder.putField("className", b => {
         stringPickler.pickle(picklee.className, b)
