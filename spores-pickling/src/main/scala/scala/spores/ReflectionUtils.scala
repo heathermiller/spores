@@ -23,7 +23,7 @@ object ReflectionUtils {
     }
 
     // Work around _className being null in any spore
-    if (clazz.getSimpleName.contains("anonspore")) {
+    if (clazz.getName.contains("anonspore")) {
       val classNameField = clazz.getDeclaredField("_className")
       classNameField.setAccessible(true)
       classNameField.set(instance, className)
