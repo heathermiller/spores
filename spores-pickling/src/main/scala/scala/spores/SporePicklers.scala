@@ -259,7 +259,7 @@ trait SporePicklers extends SimpleSporePicklers {
   }
 
   /** Generates an `Unpickler` that will be able to get the classname of another
-    * `Unpickler` and successfully instantiate it and delegate his responsability.
+    * `Unpickler` and successfully instantiate it and delegate its responsability.
     *
     * This is used to call `Unpickler`s that are generated at the same time as
     * the `Pickler`s but that cannot be run when unpickling because we don't have
@@ -523,7 +523,7 @@ object SporePicklers extends SporePicklers
 
   /******************************** Unpicklers ********************************/
 
-  /* These `Unpickler`s are meant to serialize both `Spore`s and `SporeWitEnv`s.
+  /* These `Unpickler`s are meant to unpickle both `Spore`s and `SporeWithEnv`s.
    * The subtyping relation between them forces us to have an intermediate
    * `Unpickler` which will get the correct `Unpickler` for the actual spore type. */
 

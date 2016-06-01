@@ -42,7 +42,6 @@ class PicklingBinarySpec {
 
   @Test
   def `pickle/unpickle to/from binary`(): Unit = {
-
     val v1 = 10
     val s = spore {
       val c1 = v1
@@ -53,12 +52,10 @@ class PicklingBinarySpec {
     val up = res.value.unpickle[Spore[Int, String]]
     val res2 = up(5)
     assert(res2 == "arg: 5, c1: 10")
-
   }
 
   @Test
   def `generated nested classes`(): Unit = {
-
     val s = spore {
       implicit val p = implicitly[Pickler[(Int, List[String])]]
       implicit val u = implicitly[Unpickler[(Int, List[String])]]
@@ -67,32 +64,26 @@ class PicklingBinarySpec {
     }
 
     assert(true)
-
   }
 
   @Test
   def testSimpleSpore(): Unit = {
-
     val s: Spore[Int, Int] = spore { (x: Int) => x + 1 }
     val p = s.pickle
     val s2 = p.unpickle[Spore[Int, Int]]
     assert(s2(10) == 11)
-
   }
 
   @Test
   def testSimpleSporeWithCapturedNothing(): Unit = {
-
     val s = spore { (x: Int) => x + 1 }
     val p = s.pickle
     val s2 = p.unpickle[Spore[Int, Int] {type Captured = Nothing}]
     assert(s2(10) == 11)
-
   }
 
   @Test
   def testSpore2WithEnv(): Unit = {
-
     val maxSize = 20
     val s = spore {
         val chunkSize = maxSize / 2
@@ -111,12 +102,10 @@ class PicklingBinarySpec {
     s2(("hello, " -> 0), testEmitter)
     s2(("world!" -> 9), testEmitter)
     assert(testEmitter.builder.toString == "hello, world!")
-
   }
 
   @Test
   def testSpore3WithoutEnv(): Unit = {
-
     val s = spore {
       (x: Int, y: String, z: Emitter[String]) =>
         if (x < 10) z.emit(y)
@@ -128,12 +117,10 @@ class PicklingBinarySpec {
 
     s2(9, "hello", testEmitter)
     assert(testEmitter.builder.toString == "hello")
-
   }
 
   @Test
   def testSpore3WithEnv(): Unit = {
-
     val maxSize = 10
     val factor  = 2
     val s = spore {
@@ -150,7 +137,6 @@ class PicklingBinarySpec {
 
     s2(19, "hello", testEmitter)
     assert(testEmitter.builder.toString == "hello")
-
   }
 }
 
