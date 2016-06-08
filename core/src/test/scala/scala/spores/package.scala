@@ -46,14 +46,25 @@ object util {
     }
   }
 
+  // Directory appended to the path when Intellij runs tests
+  val intellijPath = ".idea/modules/"
+
   def toolboxClasspath = {
-    val f = new java.io.File(s"core/target/scala-${scalaBinaryVersion}/classes")
-    if (!f.exists) sys.error(s"output directory ${f.getAbsolutePath} does not exist.")
-    f.getAbsolutePath
+    val f = new java.io.File(s"core/target/scala-$scalaBinaryVersion/classes")
+    val absPath = f.getAbsolutePath
+    val targetDir =
+      if(!absPath.contains(intellijPath)) f
+      else new java.io.File(absPath.replace(intellijPath,""))
+    val outputPath = targetDir.getAbsolutePath
+    if (!targetDir.exists)
+      sys.error(s"Output directory $outputPath does not exist.")
+    outputPath
   }
 
-  def expectError(errorSnippet: String, compileOptions: String = "",
-                  baseCompileOptions: String = s"-cp ${toolboxClasspath}")(code: String) {
+  def expectError(errorSnippet: String,
+                   compileOptions: String = "",
+                   baseCompileOptions: String = s"-cp $toolboxClasspath")
+                  (code: String) {
     intercept[ToolBoxError] {
       eval(code, compileOptions + " " + baseCompileOptions)
     }.getMessage mustContain errorSnippet
