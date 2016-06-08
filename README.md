@@ -1,43 +1,77 @@
 # Spores
 
-Scala Spores, safe mobile closures: [SIP-21](http://docs.scala-lang.org/sips/pending/spores.html)
+Spores are safe, mobile closures meant for library developers and distributed systems
+builders. The goal is to both control what a function is allowed to capture and
+ease the process of pickling and unpickling functions and sharing them among
+distributed machines.
+  
+More information in the official Scala
+[SIP-21](http://docs.scala-lang.org/sips/pending/spores.html).
+
+## Add spores to your project
+
+The `spores-core` and `spores-pickling` modules for Scala 2.11 are available
+on Maven Central and Sonatype. The first one contains the necessary to use
+spores in any project (core type definitions and the `spore` macro), while the
+second one enable spores serialization and deserialization. You can use Spores
+in your sbt project by simply adding the following dependency to your build
+file:
+
+```scala
+libraryDependencies += "org.scala-lang.modules" %% "spores-core" % "0.2.3"
+```
+
+To enable integration with [Scala Pickling](https://github.com/scala/pickling), add the following dependency:
+
+```scala
+libraryDependencies += "org.scala-lang.modules" %% "spores-pickling" % "0.2.3"
+```
+
+Or you can just directly download the jar files from [Maven
+Central](search.maven.org).
+
+## Define your spores!
+
+How does a spore look like?
+
+![spores shape](doc/spore-shape.png)
+
+Spores allow software developers to have a fine-grained control of what a
+function **can** or **cannot** capture from the environment. Some examples:
+
+```scala
+// A spore that doesn't capture anything from the environment
+val sum: Spore[Int, Int] {type Captured = Nothing} = spore {
+  (x: Int, y: Int) => x + y
+}
+
+val PI = 3.14159265359
+// A spore that needs a variable from the environment
+val area: Spore[Int, Int] {type Captured = Int} = spore {
+  val pi = PI
+  (r: Int) => pi * r * r
+}
+
+val actorAkka: Spore[Int, Unit] {type Excluded = ActorRef} = spore {
+  // Any reference to ActorRef in the spores header or body will fail compilation
+  val target: ActorRef = sender
+  (i: Int) => target ! i
+}
+```
+  
+Do you want more examples? Have a look at the
+[test suite](spores/core/src/test/scala/scala/spores).
 
 ## Building Spores
 
-The Spores project is built and tested using sbt. It has two modules:
-`spores-core` and `spores-pickling`. The `spores-core` module contains the
-core type definitions and the `spore` macro. The `spores-pickling` module
-integrates Spores with [scala/pickling](https://github.com/scala/pickling)
-by providing picklers for Spores.
-
-To build the core Spores module:
-```
+Do you want to play around with spores? Go ahead!
+  
+First, select the project and build it (either `spores-core` or `spores-pickling`).
 > project spores-core
-> compile
-```
-
-To run the test suite:
-```
+> buiid
+  
+Then, run the test suite:
 > test
-```
-
-## Get Spores
-
-The `spores-core` and `spores-pickling` modules for Scala 2.11 are available
-on Maven Central and Sonatype. You can use Spores in your sbt project by
-simply adding the following dependency to your build file:
-
-```scala
-libraryDependencies += "org.scala-lang.modules" %% "spores-core" % "0.1.3"
-```
-
-To enable integration with Pickling, add the following dependency:
-
-```scala
-libraryDependencies += "org.scala-lang.modules" %% "spores-pickling" % "0.1.3"
-```
-
-Or you can just directly download the jar files ([spores-core](http://search.maven.org/remotecontent?filepath=org/scala-lang/modules/spores-core_2.11/0.1.3/spores-core_2.11-0.1.3.jar), [spores-pickling](http://search.maven.org/remotecontent?filepath=org/scala-lang/modules/spores-pickling_2.11/0.1.3/spores-pickling_2.11-0.1.3.jar)).
 
 ## Updates since the first draft (June 16th, 2013) of SIP-21
 
@@ -69,11 +103,12 @@ trait DCollection[A] {
 
 ### Stable Paths
 
-A **stable path** is an expression which only contains selections and
-identifiers (no applications, for example), and for which each selected entity
-is _stable_. In this context, _stable_ means that the entity or object in
-question is introduced by object definitions or by value definitions of non-volatile
-types.
+The body of spores cannot refer to an object whose fully qualified name is not a
+stable path.  A **stable path** is an expression which only contains selections
+and identifiers (no applications, for example), and for which each selected
+entity is _stable_. In this context, _stable_ means that the entity or object in
+question is introduced by object definitions or by value definitions of
+non-volatile types.
 
 Adapted from the Scala Language specification (section 3.1), a _path_ is
 defined to be one of the following:
@@ -87,6 +122,5 @@ A path refers to an object, that is, it ends with an identifier.
 
 ### Uglies
 
-- Need to make it more convenient to create a nullary spore
 - Should objects be allowed in paths? The reason is that they are initialized lazily, so if we don't allow lazy vals, then allowing objects (which could end up being initialized only when the spore is applied) doesn't make a lot of sense.
 
