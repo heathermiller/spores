@@ -50,23 +50,30 @@ object SporeConvImpl {
 
     // goes through a tree and produces a list of TypeTree:s that appear in the tree
     object traverser extends Traverser {
-      var mentioned_types = List[TypeTree]()
+      var mentionedTypes = List[TypeTree]()
       override def traverse(tree: Tree) : Unit = tree match {
-        case tt @ TypeTree() => mentioned_types = tt :: mentioned_types
+        case tt @ TypeTree() => mentionedTypes = tt :: mentionedTypes
         case _ => super.traverse(tree)
       }
     }
     traverser.traverse(s)
 
-    // this is the check: compiler error if some TypeTree in 's' has a type that is <:< of something
-    // in A
-    traverser.mentioned_types.foreach(t =>
+    val NothingType = typeOf[Nothing]
+    /* Check that btm is indeed the
+       bottom type and that tpe is not */
+    def isBottomType(btm: Type, tpe: Type) =
+      btm =:= NothingType && !(tpe =:= btm)
+
+    /* This is the check: compiler error if some TypeTree
+       in 's' has a type that is <:< of something in A */
+    traverser.mentionedTypes.foreach(t =>
       avoidedList.foreach(at =>
-        if (t.tpe <:< at)
+        if (t.tpe <:< at && !isBottomType(t.tpe, at))
           c.error(t.pos, s"Expression has type '${t.tpe}', but type '$at' is Excluded")
     ))
 
-    // divides 's' into pieces that are put together to create a Spore[...] {type Excluded = ...}
+    /* divides 's' into pieces that are put together
+       to create a Spore[...] {type Excluded = ...} */
     val Block(l, new_instance) = s
     var class_def : Tree = null
 
