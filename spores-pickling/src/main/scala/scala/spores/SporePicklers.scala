@@ -13,7 +13,7 @@ import scala.language.experimental.macros
 import scala.pickling.pickler.GeneratorRegistry
 import scala.reflect.macros.blackbox
 
-trait SporePicklers extends SimpleSporePicklers {
+trait SporePicklers {
 
   /** The current implementation doesn't really use this method but
     * there can be corner cases or future bugs that could be fixed
@@ -73,7 +73,6 @@ trait SporePicklers extends SimpleSporePicklers {
     q"""
       $locallyPath[$resultType] {
         val $capturedPickler = implicitly[$picklerType[$utpe]]
-        val $capturedUnpickler = implicitly[$unpicklerType[$utpe]]
 
         implicit object $picklerUnpicklerName
             extends $absPicklerUnpicklerType[$sporeType]
@@ -140,7 +139,19 @@ trait SporePicklers extends SimpleSporePicklers {
     val subSporeType = tq"$sporesPath.NullarySporeWithEnv[$ttpe] {type Captured = $utpe}"
     val mySporeType = tq"$sporesPath.NullarySpore[$ttpe] {type Captured = $utpe}"
     genSporePicklerUnpicklerTemplate[U](c)(mySporeType, subSporeType)
+  }
 
+  def genSimpleNullarySporePicklerUnpicklerImpl
+      [T: c.WeakTypeTag](c: blackbox.Context): c.Tree = {
+
+    import c.universe._
+
+    val ttpe = weakTypeOf[T]
+    val utils = new PicklerUtils[c.type](c)
+    import utils.{picklerType, sporesPath}
+
+    val pu = genNullarySporePicklerUnpicklerImpl[T, Any](c)
+    q"$pu.asInstanceOf[$picklerType[$sporesPath.NullarySpore[$ttpe]]]"
   }
 
   def genSporePicklerUnpicklerImpl
@@ -163,6 +174,20 @@ trait SporePicklers extends SimpleSporePicklers {
     val mySporeType = tq"$sporesPath.Spore[$ttpe, $rtpe] {type Captured = $utpe}"
     genSporePicklerUnpicklerTemplate[U](c)(mySporeType, subSporeType)
 
+  }
+
+  def genSimpleSporePicklerUnpicklerImpl
+      [T: c.WeakTypeTag, R: c.WeakTypeTag](c: blackbox.Context): c.Tree = {
+
+    import c.universe._
+
+    val ttpe = weakTypeOf[T]
+    val rtpe = weakTypeOf[R]
+    val utils = new PicklerUtils[c.type](c)
+    import utils.{picklerType, sporesPath}
+
+    val pu = genSporePicklerUnpicklerImpl[T, R, Any](c)
+    q"$pu.asInstanceOf[$picklerType[$sporesPath.Spore[$ttpe, $rtpe]]]"
   }
 
   def genSporeWithEnvPicklerUnpicklerImpl
@@ -229,6 +254,21 @@ trait SporePicklers extends SimpleSporePicklers {
 
   }
 
+  def genSimpleSpore2PicklerUnpicklerImpl
+      [T1: c.WeakTypeTag, T2: c.WeakTypeTag, R: c.WeakTypeTag]
+      (c: blackbox.Context): c.Tree = {
+    import c.universe._
+
+    val t1pe = weakTypeOf[T1]
+    val t2pe = weakTypeOf[T2]
+    val rtpe = weakTypeOf[R]
+    val utils = new PicklerUtils[c.type](c)
+    import utils.{picklerType, sporesPath}
+
+    val pu = genSpore2PicklerUnpicklerImpl[T1, T2, R, Any](c)
+    q"$pu.asInstanceOf[$picklerType[$sporesPath.Spore2[$t1pe, $t2pe, $rtpe]]]"
+  }
+
   def genSpore2WithEnvPicklerUnpicklerImpl
       [T1: c.WeakTypeTag, T2: c.WeakTypeTag, R: c.WeakTypeTag, U: c.WeakTypeTag]
       (c: blackbox.Context): c.Tree = {
@@ -273,6 +313,23 @@ trait SporePicklers extends SimpleSporePicklers {
     val subSporeType = tq"$sporesPath.Spore3WithEnv[$t1pe, $t2pe, $t3pe, $rtpe] {type Captured = $utpe}"
     genSporePicklerUnpicklerTemplate[U](c)(sporeType, subSporeType)
 
+  }
+
+  def genSimpleSpore3PicklerUnpicklerImpl
+      [T1: c.WeakTypeTag, T2: c.WeakTypeTag, T3: c.WeakTypeTag, R: c.WeakTypeTag]
+      (c: blackbox.Context): c.Tree = {
+
+    import c.universe._
+
+    val t1pe = weakTypeOf[T1]
+    val t2pe = weakTypeOf[T2]
+    val t3pe = weakTypeOf[T3]
+    val rtpe = weakTypeOf[R]
+    val utils = new PicklerUtils[c.type](c)
+    import utils.{picklerType, sporesPath}
+
+    val pu = genSpore3PicklerUnpicklerImpl[T1, T2, T3, R, Any](c)
+    q"$pu.asInstanceOf[$picklerType[$sporesPath.Spore2[$t1pe, $t2pe, $t3pe, $rtpe]]]"
   }
 
   def genSpore3WithEnvPicklerUnpicklerImpl
@@ -603,16 +660,16 @@ object SporePicklers extends SporePicklers
    * since this will screw up the implicit search for any given `Spore` */
 
   implicit def genNullarySporePickler[T]: FullPN[T] =
-    macro genNullarySporePicklerImpl[T]
+    macro genSimpleNullarySporePicklerUnpicklerImpl[T]
 
   implicit def genSimpleSporePickler[T, R]: FullP[T, R] =
-    macro genSimpleSporePicklerImpl[T, R]
+    macro genSimpleSporePicklerUnpicklerImpl[T, R]
 
   implicit def genSimpleSpore2Pickler[T1, T2, R]: FullP2[T1, T2, R] =
-    macro genSimpleSpore2PicklerImpl[T1, T2, R]
+    macro genSimpleSpore2PicklerUnpicklerImpl[T1, T2, R]
 
   implicit def genSimpleSpore3Pickler[T1, T2, T3, R]: FullP3[T1, T2, T3, R] =
-    macro genSimpleSpore3PicklerImpl[T1, T2, T3, R]
+    macro genSimpleSpore3PicklerUnpicklerImpl[T1, T2, T3, R]
 
   /******************************** Unpicklers ********************************/
 
