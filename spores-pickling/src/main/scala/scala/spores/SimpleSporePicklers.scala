@@ -8,12 +8,14 @@
 
 package scala.spores
 
+/* Don't remove imports, macros use them */
 import scala.pickling._
+import scala.reflect.macros.blackbox
 import scala.reflect.macros.blackbox.Context
 
 trait SimpleSporePicklers {
 
-  def genSimpleSporePicklerUnpicklerTemplate(c: Context)
+  def genSimpleSporePicklerUnpicklerTemplate(c: blackbox.Context)
     (seedPicklerName: String, sporeType: c.Tree): c.Tree = {
 
     import c.universe._
@@ -60,8 +62,23 @@ trait SimpleSporePicklers {
 
   }
 
+  def genNullarySporePicklerImpl
+      [T: c.WeakTypeTag](c: blackbox.Context): c.Tree = {
+
+    import c.universe._
+
+    val ttpe = weakTypeOf[T]
+    debug(s"T: $ttpe")
+
+    val utils = new PicklerUtils[c.type](c)
+    import utils.sporesPath
+    val sporeType = tq"$sporesPath.NullarySpore[$ttpe]"
+    genSimpleSporePicklerUnpicklerTemplate(c)("NullarySporePickler", sporeType)
+
+  }
+
   def genSimpleSporePicklerImpl
-      [T: c.WeakTypeTag, R: c.WeakTypeTag](c: Context): c.Tree = {
+      [T: c.WeakTypeTag, R: c.WeakTypeTag](c: blackbox.Context): c.Tree = {
 
     import c.universe._
 
@@ -78,7 +95,7 @@ trait SimpleSporePicklers {
 
   def genSimpleSpore2PicklerImpl
       [T1: c.WeakTypeTag, T2: c.WeakTypeTag, R: c.WeakTypeTag]
-      (c: Context): c.Tree = {
+      (c: blackbox.Context): c.Tree = {
 
     import c.universe._
 
@@ -96,7 +113,7 @@ trait SimpleSporePicklers {
 
   def genSimpleSpore3PicklerImpl
       [T1: c.WeakTypeTag, T2: c.WeakTypeTag, T3: c.WeakTypeTag, R: c.WeakTypeTag]
-      (c: Context): c.Tree = {
+      (c: blackbox.Context): c.Tree = {
 
     import c.universe._
 
