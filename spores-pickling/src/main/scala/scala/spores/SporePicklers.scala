@@ -66,7 +66,7 @@ trait SporePicklers {
     val picklerUnpicklerName = c.freshName(TermName("SporePicklerUnpickler"))
 
     val utils = new PicklerUtils[c.type](c)
-    import utils.{absPicklerUnpicklerType, picklerType, unpicklerType, pbuilderType, preaderType, scalaPath}
+    import utils.{absPicklerUnpicklerType, picklerType, unpicklerType, pbuilderType, preaderType}
     import utils.{fastTypeTagType, stringType, anyType, unitType, autoRegisterType, locallyPath}
     val resultType = tq"$absPicklerUnpicklerType[$sporeType]"
 
@@ -290,7 +290,7 @@ trait SporePicklers {
     genSporePicklerUnpicklerTemplate[U](c)(sporeType, sporeType)
 
   }
-  
+
   def genSpore3PicklerUnpicklerImpl
       [T1: c.WeakTypeTag, T2: c.WeakTypeTag, T3: c.WeakTypeTag, R: c.WeakTypeTag, U: c.WeakTypeTag]
       (c: blackbox.Context): c.Tree = {
@@ -570,7 +570,9 @@ trait SporePicklers {
 }
 
 object SporePicklers extends SporePicklers
-    with SporeRuntimePicklers with GeneratorRegistry {
+    with SporeRuntimePicklers
+    with SporeProxyRuntimePicklers
+    with GeneratorRegistry {
 
   /* Unify type for returning both a pickler and unpickler
    * that keeps track of the captured type inside a `Spore` */
@@ -703,11 +705,9 @@ object SporePicklers extends SporePicklers
 
   /********************** Runtime picklers and unpicklers *********************/
 
-  def registerRuntimePicklerUnpickler(): Unit =
-    registerPicklerAsGen(SporeRuntimePicklerUnpickler)
-
   locally {
-    registerRuntimePicklerUnpickler()
+    registerPicklerAsGen(NullarySporeRuntimePicklerUnpickler)
+    registerPicklerAsGen(SporeRuntimePicklerUnpickler)
   }
 
 }

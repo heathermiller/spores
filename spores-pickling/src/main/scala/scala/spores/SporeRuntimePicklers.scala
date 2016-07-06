@@ -13,6 +13,36 @@ import scala.pickling.pickler.AnyPicklerUnpickler
   */
 private[spores] trait SporeRuntimePicklers extends GeneratorHelper {
 
+  object NullarySporeRuntimePicklerUnpickler
+    extends AbstractPicklerUnpickler[NullarySpore[Any]] {
+
+    override def tag =
+      FastTypeTag("scala.spores.NullarySpore[scala.Any]")
+
+    override def pickle(picklee: NullarySpore[Any], builder: PBuilder): Unit = {
+      builder.beginEntry(picklee, tag)
+      builder.putField("unpicklerClassName", b => {
+        stringPickler.pickle(this.getClass.getName, b)
+      })
+      builder.putField("className", b => {
+        stringPickler.pickle(picklee.className, b)
+      })
+      builder.endEntry()
+    }
+
+    override def unpickle(tag: String, reader: PReader): Any = {
+      val className = {
+        val reader1 = reader.readField("className")
+        val tag = reader1.beginEntry()
+        val result = stringPickler.unpickle(tag, reader1)
+        reader1.endEntry()
+        result.asInstanceOf[String]
+      }
+
+      ReflectionUtils.createInstance(className)
+    }
+  }
+
   object SporeRuntimePicklerUnpickler
       extends AbstractPicklerUnpickler[Spore[Any, Any]] {
 

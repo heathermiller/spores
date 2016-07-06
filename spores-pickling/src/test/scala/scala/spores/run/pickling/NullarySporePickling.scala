@@ -110,4 +110,70 @@ class NullarySporePickling {
     assert(ns() == ns2())
   }
 
+  @Test
+  def `pickle/unpickle a NullarySpore capturing another NullarySpore`(): Unit = {
+    val cns: NullarySpore[Int] = spore { () => 2 }
+    val ns: NullarySpore[Int] {type Captured = NullarySpore[Int] } = spore {
+      val ap = cns
+      () => ap()
+    }
+    val pickled = ns.pickle
+    val ns2 = pickled.unpickle[NullarySpore[Int]]
+    assert(ns() == ns2())
+  }
+
+  @Test
+  def `pickle/unpickle a NullarySpore capturing another NullarySpore with env`(): Unit = {
+    val f = 3
+    val cns: NullarySpore[Int] = spore {
+      val h = f
+      () => 2 + h
+    }
+    val ns: NullarySpore[Int] {type Captured = NullarySpore[Int] } = spore {
+      val ap = cns
+      () => ap()
+    }
+    val pickled = ns.pickle
+    val ns2 = pickled.unpickle[NullarySpore[Int]]
+    assert(ns() == ns2())
+  }
+
+  @Test
+  def `pickle/unpickle a NullarySpore capturing another NullarySpore as Any`(): Unit = {
+    val cns: NullarySpore[Int] = spore { () => 2 }
+    val ns: NullarySpore[Int] {type Captured = NullarySpore[Int] } = spore {
+      val ap = cns
+      () => ap()
+    }
+    val pickled = ns.pickle
+    val ns2 = pickled.unpickle[Any].asInstanceOf[NullarySpore[Int]]
+    assert(ns() == ns2())
+  }
+
+  @Test
+  def `pickle/unpickle a NullarySpore capturing another NullarySpore with env as Any`(): Unit = {
+    val f = 3
+    val cns: NullarySpore[Int] = spore {
+      val h = f
+      () => 2 + h
+    }
+    val ns: NullarySpore[Int] {type Captured = NullarySpore[Int] } = spore {
+      val ap = cns
+      () => ap()
+    }
+    val pickled = ns.pickle
+    println(pickled)
+    val ns2 = pickled.unpickle[Any].asInstanceOf[NullarySpore[Int]]
+    assert(ns() == ns2())
+
+    val nss: NullarySpore[Int] = spore {
+      val ap = cns
+      () => ap()
+    }
+    val pickled2 = nss.pickle
+    println(pickled2)
+    val nss2 = pickled2.unpickle[Any].asInstanceOf[NullarySpore[Int]]
+    assert(nss() == nss2())
+  }
+
 }
