@@ -211,4 +211,16 @@ class PicklingSpec {
     assert(s(1,2,3) == s2(1,2,3))
   }
 
+  @Test
+  def `pickle/unpickle a SporeWithEnv as spore`(): Unit = {
+    val b = 2
+    val ns: Spore[Int, Int] = spore {
+      val num = b
+      (x: Int) => x + 1 + num
+    }
+    val pickled = ns.pickle
+    val ns2 = pickled.unpickle[Spore[Int, Int]]
+    assert(ns(1) == ns2(1))
+  }
+
 }

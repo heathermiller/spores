@@ -13,6 +13,9 @@ package scala.spores
   * It is public because macros access it outside the spores package. */
 object ReflectionUtils {
 
+  def isSpore(className: String) =
+    className.contains("anonspore")
+
   def createInstance[T](className: String): T = {
 
     val clazz = java.lang.Class.forName(className)
@@ -23,7 +26,7 @@ object ReflectionUtils {
     }
 
     // Work around _className being null in any spore
-    if (clazz.getName.contains("anonspore")) {
+    if (isSpore(clazz.getName)) {
       val classNameField = clazz.getDeclaredField("_className")
       classNameField.setAccessible(true)
       classNameField.set(instance, className)

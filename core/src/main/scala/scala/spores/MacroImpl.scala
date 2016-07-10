@@ -354,6 +354,7 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
 
       q"""
         class $sporeClassName extends scala.spores.NullarySpore[$rtpe] {
+          type Captured = Nothing
           this._className = this.getClass.getName
           $applyDefDef
         }
