@@ -35,9 +35,11 @@ package object spores {
 
   def spore[T1, T2, T3, R](fun: (T1, T2, T3) => R): Spore3[T1, T2, T3, R] = macro spore3Impl[T1, T2, T3, R]
 
-  def spore[R](fun: Function0[R]): NullarySpore[R] = macro nullarySporeImpl[R]
+  def spore[R](fun: () => R): NullarySpore[R] = macro nullarySporeImpl[R]
 
   implicit def mkSpore[T, R](fun: T => R): Spore[T, R] = macro sporeImpl[T, R]
+
+  implicit def mkNullarySpore[R](fun: () => R): NullarySpore[R] = macro nullarySporeImpl[R]
 
   def delayed[T](body: T): Function0[T] = new Function0[T] {
     def apply(): T = body
