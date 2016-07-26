@@ -98,6 +98,17 @@ object SporesBuild extends Build {
     settings = buildSettings ++ publishSettings
   ) dependsOn(core)
 
+  lazy val sandbox = Project(
+    id   = "sandbox",
+    base = file("sandbox")
+  ) settings (
+    buildSettings ++ Seq(
+      scalacOptions in Compile ++= Seq("-Xprint:typer")
+    )
+  ) settings (
+    publishArtifact in Compile := false
+  ) dependsOn(core)
+
   override lazy val settings =
     super.settings ++
     buildSettings
