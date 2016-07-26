@@ -6,6 +6,11 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
 
+
+object Global {
+  var x: Int = 0
+}
+
 @RunWith(classOf[JUnit4])
 class ImplicitConversionSpec {
   @Test
@@ -43,4 +48,19 @@ class ImplicitConversionSpec {
   //     s"arg: $x, cc1: $cc1"
   //   }
   // }
+
+  @Test
+  def nullarySpore(): Unit = {
+    val s1: NullarySpore[Unit] = () => {}
+    val s2: NullarySpore[Unit] = () => {
+      Global.x = 10
+    }
+    val s3: NullarySpore[Int] = () => {
+      40 + 2
+    }
+    s2()
+    assert(Global.x == 10)
+    assert(s3() == 42)
+  }
+
 }
