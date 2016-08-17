@@ -10,7 +10,6 @@ package scala.spores
 
 import scala.reflect.macros.whitebox.Context
 
-
 private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
   import c.universe._
 
@@ -18,25 +17,26 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
    * to check if a class is indeed a spore */
   val anonSporeName = TypeName("anonspore")
 
-  /* Checks whether the owner chain of `sym` contains `owner`.
-   *
-   * @param sym   the symbol to be checked
-   * @param owner the owner symbol that we try to find
-   * @return      whether `owner` is a direct or indirect owner of `sym`
-   */
-  def ownerChainContains(sym: Symbol, owner: Symbol): Boolean =
+  /** Checks whether the owner chain of `sym` contains `owner`.
+    *
+    * @param sym   the symbol to be checked
+    * @param owner the owner symbol that we try to find
+    * @return      whether `owner` is a direct or indirect owner of `sym`
+    */
+  def isOwner(sym: Symbol, owner: Symbol): Boolean = {
     sym != null && (sym.owner == owner || {
-      sym.owner != NoSymbol && ownerChainContains(sym.owner, owner)
+      sym.owner != NoSymbol && isOwner(sym.owner, owner)
     })
+  }
 
-  /* Checks whether `member` is selected from a static selector, or whether
-   * its selector is transitively selected from a static symbol.
-   */
-  def selectorIsStatic(member: Tree): Boolean = member match {
+  /** Checks whether `member` is selected from a static selector, or whether
+    * its selector is transitively selected from a static symbol.
+    */
+  def isStaticSelector(member: Tree): Boolean = member match {
     case Select(selector, member0) =>
       val selStatic = selector.symbol.isStatic
       debug(s"checking whether $selector is static...$selStatic")
-      selStatic || selectorIsStatic(selector)
+      selStatic || isStaticSelector(selector)
     case _ => false
   }
 
@@ -52,7 +52,9 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
             c.error(stmt.pos, "Only val defs allowed at this position")
             List()
         }
-        validVarSyms foreach { sym => debug("valid: " + sym) }
+        validVarSyms foreach { sym =>
+          debug("valid: " + sym)
+        }
         (validVarSyms, expr)
 
       case expr =>
@@ -70,7 +72,9 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
         // nullary spore
         (null, List(), arg)
       case _ =>
-        c.error(funLiteral.pos, "Incorrect usage of `spore`: function literal or `delayed` expression expected")
+        c.error(
+          funLiteral.pos,
+          "Incorrect usage of `spore`: function literal or `delayed` expression expected")
         (null, null, null)
     }
 
@@ -83,13 +87,13 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
 
       // is the use of symbol s allowed via spore rules? (in the spore body)
       def isSymbolValid(s: Symbol): Boolean =
-        validEnv.contains(s) ||              // is `s` declared in the spore header?
-        capturedSyms.contains(s) ||          // is `s` captured using the `capture` syntax?
-        (fun != null && ownerChainContains(s, fun.symbol)) || // is `s` declared within `fun`?
-        declaredSyms.contains(s) ||
-        s == NoSymbol ||                     // is `s` == `_`?
-        s.isStatic ||
-        s.owner == definitions.PredefModule
+        validEnv.contains(s) || // is `s` declared in the spore header?
+          capturedSyms.contains(s) || // is `s` captured using the `capture` syntax?
+          (fun != null && isOwner(s, fun.symbol)) || // is `s` declared within `fun`?
+          declaredSyms.contains(s) ||
+          s == NoSymbol || // is `s` == `_`?
+          s.isStatic ||
+          s.owner == definitions.PredefModule
 
       // is tree t a path with only components that satisfy pred? (eg stable or lazy)
       def isPathWith(t: Tree)(pred: TermSymbol => Boolean): Boolean = t match {
@@ -111,38 +115,41 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
         debug(s"checking isPathValid for $tree [${tree.symbol}]...")
         debug(s"tree class: ${tree.getClass.getName}")
         if (tree.symbol != null && isSymbolValid(tree.symbol)) (true, None)
-        else tree match {
-          case Select(pre, sel) =>
-            debug(s"case 1: Select($pre, $sel)")
-            isPathValid(pre)
-          case Apply(Select(pre, _), _) =>
-            debug(s"case 2: Apply(Select, _)")
-            isPathValid(pre)
-          case TypeApply(Select(pre, _), _) =>
-            debug("case 3: TypeApply(Select, _)")
-            isPathValid(pre)
-          case TypeApply(fun, _) =>
-            debug("case 4: TypeApply")
-            isPathValid(fun)
-          case Literal(Constant(_)) | New(_) =>
-            (true, None)
-          case id: Ident =>
-            (isSymbolValid(id.symbol), None)
-          case _ =>
-            debug("case 7: _")
-            (false, Some(tree))
-        }
+        else
+          tree match {
+            case Select(pre, sel) =>
+              debug(s"case 1: Select($pre, $sel)")
+              isPathValid(pre)
+            case Apply(Select(pre, _), _) =>
+              debug(s"case 2: Apply(Select, _)")
+              isPathValid(pre)
+            case TypeApply(Select(pre, _), _) =>
+              debug("case 3: TypeApply(Select, _)")
+              isPathValid(pre)
+            case TypeApply(fun, _) =>
+              debug("case 4: TypeApply")
+              isPathValid(fun)
+            case Literal(Constant(_)) | New(_) =>
+              (true, None)
+            case id: Ident =>
+              (isSymbolValid(id.symbol), None)
+            case _ =>
+              debug("case 7: _")
+              (false, Some(tree))
+          }
       }
 
       // traverse the spore body and collect symbols in `capture` invocations
       val collectCapturedTraverser = new Traverser {
         override def traverse(tree: Tree): Unit = tree match {
-          case app @ Apply(fun, List(captured)) if (fun.symbol == captureSym) =>
+          case app @ Apply(fun, List(captured))
+              if (fun.symbol == captureSym) =>
             debug("found capture: " + app)
             if (!isPathWith(captured)(_.isStable))
               c.error(captured.pos, "Only stable paths can be captured")
             else if (!isPathWith(captured)(!_.isLazy))
-              c.error(captured.pos, "A captured path cannot contain lazy members")
+              c.error(captured.pos,
+                      "A captured path cannot contain lazy members")
             else
               capturedSyms ::= captured.symbol
           case _ =>
@@ -175,21 +182,27 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
               debug("checking select (app): " + sel)
               if (app.symbol.isStatic) {
                 debug(s"OK, invocation of '$app' is static")
-              } else fun0 match {
-                case Select(obj, _) =>
-                  if (fun != null && ownerChainContains(obj.symbol, fun.symbol)) debug(s"OK, selected on local object $obj")
-                  else {
-                    // the invocation is OK if `obj` is transitively selected from a top-level object
-                    debug(s"checking whether $obj is transitively selected from a top-level object...")
-                    val objIsStatic = obj.symbol.isStatic || selectorIsStatic(obj)
-                    debug(s"$obj.symbol.isStatic: $objIsStatic")
-                    if (!objIsStatic)
-                      c.error(sel.pos, s"the invocation of '$fun0' is not static")
-                  }
+              } else
+                fun0 match {
+                  case Select(obj, _) =>
+                    if (fun != null && isOwner(obj.symbol, fun.symbol))
+                      debug(s"OK, selected on local object $obj")
+                    else {
+                      // the invocation is OK if `obj` is transitively selected from a top-level object
+                      debug(
+                        s"checking whether $obj is transitively selected from a top-level object...")
+                      val objIsStatic = obj.symbol.isStatic || isStaticSelector(
+                          obj)
+                      debug(s"$obj.symbol.isStatic: $objIsStatic")
+                      if (!objIsStatic)
+                        c.error(sel.pos,
+                                s"the invocation of '$fun0' is not static")
+                    }
 
-                case _ =>
-                  c.error(sel.pos, s"the invocation of '$fun0' is not static")
-              }
+                  case _ =>
+                    c.error(sel.pos,
+                            s"the invocation of '$fun0' is not static")
+                }
 
             case sel @ Select(pre, _) =>
               debug("checking select " + sel)
@@ -200,9 +213,9 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
                 case (false, Some(subtree)) =>
                   traverse(subtree)
                 case (true, None) =>
-                  // do nothing
+                // do nothing
                 case (true, Some(subtree)) =>
-                  // do nothing
+                // do nothing
               }
 
             case _ =>
@@ -221,24 +234,35 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
 
     val (paramSyms, retTpe, funBody, validEnv) = conforms(funTree)
 
-    val applyParamNames = for (i <- 0 until paramSyms.size) yield c.freshName(TermName("x" + i))
+    val applyParamNames = for (i <- 0 until paramSyms.size)
+      yield c.freshName(TermName("x" + i))
     val ids = for (name <- applyParamNames.toList) yield Ident(name)
 
-    val applyParamValDefs = for ((applyParamName, paramSym) <- applyParamNames.zip(paramSyms))
-      yield ValDef(Modifiers(Flag.PARAM), applyParamName, TypeTree(paramSym.typeSignature), EmptyTree)
+    val applyParamValDefs =
+      for ((applyParamName, paramSym) <- applyParamNames.zip(paramSyms))
+        yield
+          ValDef(Modifiers(Flag.PARAM),
+                 applyParamName,
+                 TypeTree(paramSym.typeSignature),
+                 EmptyTree)
     val applyParamSymbols = for (applyParamValDef <- applyParamValDefs)
       yield applyParamValDef.symbol
 
     def mkApplyDefDef(body: Tree): DefDef = {
       val applyVParamss = List(applyParamValDefs.toList)
-      DefDef(NoMods, TermName("apply"), Nil, applyVParamss, TypeTree(retTpe), body)
+      DefDef(NoMods,
+             TermName("apply"),
+             Nil,
+             applyVParamss,
+             TypeTree(retTpe),
+             body)
     }
 
     val symtable = c.universe.asInstanceOf[scala.reflect.internal.SymbolTable]
 
     def processFunctionBody(m: Map[c.Symbol, Tree], funBody: Tree): DefDef = {
       val newFunBody = transformTypes(m)(funBody)
-      val nfBody     = c.untypecheck(newFunBody.asInstanceOf[Tree])
+      val nfBody = c.untypecheck(newFunBody.asInstanceOf[Tree])
       mkApplyDefDef(nfBody)
     }
 
@@ -251,7 +275,8 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
 
       if (paramSyms.size == 2) {
         q"""
-          class $sporeClassName extends scala.spores.Spore2[${tpes(1)}, ${tpes(2)}, ${tpes(0)}] {
+          class $sporeClassName extends scala.spores.Spore2[${tpes(1)}, ${tpes(
+          2)}, ${tpes(0)}] {
             self =>
             type Captured = scala.Nothing
             this._className = this.getClass.getName
@@ -261,7 +286,8 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
         """
       } else if (paramSyms.size == 3) {
         q"""
-          class $sporeClassName extends scala.spores.Spore3[${tpes(1)}, ${tpes(2)}, ${tpes(3)}, ${tpes(0)}] {
+          class $sporeClassName extends scala.spores.Spore3[${tpes(1)}, ${tpes(
+          2)}, ${tpes(3)}, ${tpes(0)}] {
             self =>
             type Captured = scala.Nothing
             this._className = this.getClass.getName
@@ -271,47 +297,67 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
         """
       } else ???
     } else { // validEnv.size > 1 (TODO: size == 1)
-        // replace references to paramSyms with references to applyParamSymbols
-        // and references to captured variables to new fields
-        val capturedTypes = validEnv.map(_.typeSignature)
-        debug(s"capturedTypes: ${capturedTypes.mkString(",")}")
+      // replace references to paramSyms with references to applyParamSymbols
+      // and references to captured variables to new fields
+      val capturedTypes = validEnv.map(_.typeSignature)
+      debug(s"capturedTypes: ${capturedTypes.mkString(",")}")
 
-        val symsToReplace     = paramSyms ::: validEnv
-        val newTrees          =
-          if (validEnv.size == 1) List(Select(Ident(TermName("self")), TermName("captured")))
-          else (1 to validEnv.size).map(i => Select(Select(Ident(TermName("self")), TermName("captured")), TermName(s"_$i"))).toList
+      val symsToReplace = paramSyms ::: validEnv
+      val newTrees =
+        if (validEnv.size == 1)
+          List(Select(Ident(TermName("self")), TermName("captured")))
+        else
+          (1 to validEnv.size)
+            .map(
+              i =>
+                Select(Select(Ident(TermName("self")), TermName("captured")),
+                       TermName(s"_$i")))
+            .toList
 
-        val treesToSubstitute = ids ::: newTrees
-        val m = symsToReplace.zip(treesToSubstitute).toMap
-        val applyDefDef       = processFunctionBody(m, funBody)
+      val treesToSubstitute = ids ::: newTrees
+      val m = symsToReplace.zip(treesToSubstitute).toMap
+      val applyDefDef = processFunctionBody(m, funBody)
 
-        val rhss = funTree match {
-          case Block(stmts, expr) =>
-            stmts.toList flatMap {
-              case ValDef(_, _, _, rhs) => List(rhs)
-              case stmt =>
-                c.error(stmt.pos, "Only val defs allowed at this position")
-                List()
-            }
-        }
+      val rhss = funTree match {
+        case Block(stmts, expr) =>
+          stmts.toList flatMap {
+            case ValDef(_, _, _, rhs) => List(rhs)
+            case stmt =>
+              c.error(stmt.pos, "Only val defs allowed at this position")
+              List()
+          }
+      }
 
-        val constructorParams = List(List(toTuple(rhss)))
+      val constructorParams = List(List(toTuple(rhss)))
 
-        val captureTypeTreeDefinition = (if (capturedTypes.size == 1) q"type Captured = ${capturedTypes(0)}"
-          else if (capturedTypes.size == 2) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)})"
-          else if (capturedTypes.size == 3) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)})"
-          else if (capturedTypes.size == 4) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)})"
-          else if (capturedTypes.size == 5) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)}, ${capturedTypes(4)})"
-          else if (capturedTypes.size == 6) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)}, ${capturedTypes(4)}, ${capturedTypes(5)})"
-          else if (capturedTypes.size == 7) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)}, ${capturedTypes(4)}, ${capturedTypes(5)}, ${capturedTypes(6)})"
-          else if (capturedTypes.size == 8) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)}, ${capturedTypes(4)}, ${capturedTypes(5)}, ${capturedTypes(6)}, ${capturedTypes(7)})").asInstanceOf[c.Tree]
+      val captureTypeTreeDefinition =
+        (if (capturedTypes.size == 1) q"type Captured = ${capturedTypes(0)}"
+         else if (capturedTypes.size == 2)
+           q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)})"
+         else if (capturedTypes.size == 3)
+           q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)})"
+         else if (capturedTypes.size == 4) q"type Captured = (${capturedTypes(
+           0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)})"
+         else if (capturedTypes.size == 5)
+           q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(
+             2)}, ${capturedTypes(3)}, ${capturedTypes(4)})"
+         else if (capturedTypes.size == 6)
+           q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(
+             2)}, ${capturedTypes(3)}, ${capturedTypes(4)}, ${capturedTypes(5)})"
+         else if (capturedTypes.size == 7)
+           q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(
+             3)}, ${capturedTypes(4)}, ${capturedTypes(5)}, ${capturedTypes(6)})"
+         else if (capturedTypes.size == 8) q"type Captured = (${capturedTypes(
+           0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)}, ${capturedTypes(
+           4)}, ${capturedTypes(5)}, ${capturedTypes(6)}, ${capturedTypes(7)})")
+          .asInstanceOf[c.Tree]
 
-        val q"type $_ = $captureTypeTree" = captureTypeTreeDefinition
-
+      val q"type $_ = $captureTypeTree" = captureTypeTreeDefinition
 
       if (paramSyms.size == 2) {
-          q"""
-            class $sporeClassName(val captured: $captureTypeTree) extends scala.spores.Spore2WithEnv[${tpes(1)}, ${tpes(2)}, ${tpes(0)}] {
+        q"""
+            class $sporeClassName(val captured: $captureTypeTree) extends scala.spores.Spore2WithEnv[${tpes(
+          1)}, ${tpes(2)}, ${tpes(0)}] {
               self =>
               $captureTypeTreeDefinition
               this._className = this.getClass.getName
@@ -319,9 +365,10 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
             }
             new $sporeClassName(...$constructorParams)
           """
-        } else if (paramSyms.size == 3) {
-          q"""
-            class $sporeClassName(val captured: $captureTypeTree) extends scala.spores.Spore3WithEnv[${tpes(1)}, ${tpes(2)}, ${tpes(3)}, ${tpes(0)}] {
+      } else if (paramSyms.size == 3) {
+        q"""
+            class $sporeClassName(val captured: $captureTypeTree) extends scala.spores.Spore3WithEnv[${tpes(
+          1)}, ${tpes(2)}, ${tpes(3)}, ${tpes(0)}] {
               self =>
               $captureTypeTreeDefinition
               this._className = this.getClass.getName
@@ -329,7 +376,7 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
             }
             new $sporeClassName(...$constructorParams)
           """
-        } else ???
+      } else ???
     }
   }
 
@@ -338,7 +385,7 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
        val x = outer
        delayed { ... }
      }
-   */
+    */
   def checkNullary(funTree: c.Tree, rtpe: c.Type): c.Tree = {
     debug(s"SPORES: enter checkNullary")
 
@@ -350,7 +397,12 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
 
     if (validEnv.isEmpty) {
       val newFunBody = c.untypecheck(funBody)
-      val applyDefDef = DefDef(NoMods, applyName, Nil, List(List()), TypeTree(retTpe), newFunBody)
+      val applyDefDef = DefDef(NoMods,
+                               applyName,
+                               Nil,
+                               List(List()),
+                               TypeTree(retTpe),
+                               newFunBody)
 
       q"""
         class $sporeClassName extends scala.spores.NullarySpore[$rtpe] {
@@ -367,14 +419,22 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
       // replace references to captured variables with references to new fields
       val symsToReplace = validEnv
       val newTrees =
-        if (validEnv.size == 1) List(Select(Ident(TermName("self")), TermName("captured")))
-        else (1 to validEnv.size).map(i => Select(Select(Ident(TermName("self")), TermName("captured")), TermName(s"_$i"))).toList
+        if (validEnv.size == 1)
+          List(Select(Ident(TermName("self")), TermName("captured")))
+        else
+          (1 to validEnv.size)
+            .map(
+              i =>
+                Select(Select(Ident(TermName("self")), TermName("captured")),
+                       TermName(s"_$i")))
+            .toList
       val treesToSubstitute = newTrees
       val symsToTrees = symsToReplace.zip(treesToSubstitute).toMap
-      val newFunBody = transformTypes(symsToTrees ) (funBody)
+      val newFunBody = transformTypes(symsToTrees)(funBody)
 
       val nfBody = c.untypecheck(newFunBody.asInstanceOf[c.universe.Tree])
-      val applyDefDef = DefDef(NoMods, applyName, Nil, List(List()), TypeTree(retTpe), nfBody)
+      val applyDefDef =
+        DefDef(NoMods, applyName, Nil, List(List()), TypeTree(retTpe), nfBody)
 
       val rhss = funTree match {
         case Block(stmts, expr) =>
@@ -393,14 +453,27 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
 
       val superclassName = TypeName("NullarySporeWithEnv")
 
-      val captureTypeTreeDefinition = (if (capturedTypes.size == 1) q"type Captured = ${capturedTypes(0)}"
-        else if (capturedTypes.size == 2) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)})"
-        else if (capturedTypes.size == 3) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)})"
-        else if (capturedTypes.size == 4) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)})"
-        else if (capturedTypes.size == 5) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)}, ${capturedTypes(4)})"
-        else if (capturedTypes.size == 6) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)}, ${capturedTypes(4)}, ${capturedTypes(5)})"
-        else if (capturedTypes.size == 7) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)}, ${capturedTypes(4)}, ${capturedTypes(5)}, ${capturedTypes(6)})"
-        else if (capturedTypes.size == 8) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)}, ${capturedTypes(4)}, ${capturedTypes(5)}, ${capturedTypes(6)}, ${capturedTypes(7)})").asInstanceOf[c.Tree]
+      val captureTypeTreeDefinition =
+        (if (capturedTypes.size == 1) q"type Captured = ${capturedTypes(0)}"
+         else if (capturedTypes.size == 2)
+           q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)})"
+         else if (capturedTypes.size == 3)
+           q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)})"
+         else if (capturedTypes.size == 4) q"type Captured = (${capturedTypes(
+           0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)})"
+         else if (capturedTypes.size == 5)
+           q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(
+             2)}, ${capturedTypes(3)}, ${capturedTypes(4)})"
+         else if (capturedTypes.size == 6)
+           q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(
+             2)}, ${capturedTypes(3)}, ${capturedTypes(4)}, ${capturedTypes(5)})"
+         else if (capturedTypes.size == 7)
+           q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(
+             3)}, ${capturedTypes(4)}, ${capturedTypes(5)}, ${capturedTypes(6)})"
+         else if (capturedTypes.size == 8) q"type Captured = (${capturedTypes(
+           0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)}, ${capturedTypes(
+           4)}, ${capturedTypes(5)}, ${capturedTypes(6)}, ${capturedTypes(7)})")
+          .asInstanceOf[c.Tree]
 
       val q"type $_ = $captureTypeTree" = captureTypeTreeDefinition
 
@@ -422,26 +495,28 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
     *  The syntax tree part of these PTTs shows as "TypeTree()", but the ().tpe part has additional structure.
     *  The 'TypeTree' case transforms these types by adding an "().original" field, that is a syntax tree.
     *  The syntax tree is constructed by replacing all TypeName(s) occurances where s is the name of a captured
-    *  variable or a parameter into nameMap(s). E.g. 
+    *  variable or a parameter into nameMap(s). E.g.
     *  TypeRef(SingleType(SingleType(NoPrefix, TermName("param")), TypeName("R") --> Select(nameMap("param"), TypeName("R"))
     */
-  def transformTypes(m: Map[c.universe.Symbol, Tree]) : Tree => Tree = {
-    class TypeTransformer(val m: Map[c.universe.Symbol, Tree]//,
-                          //val nameMap: Map[c.universe.Symbol, Tree]
-                         ) extends Transformer {
+  def transformTypes(m: Map[c.universe.Symbol, Tree]): Tree => Tree = {
+    class TypeTransformer(
+        val m: Map[c.universe.Symbol, Tree] //,
+        //val nameMap: Map[c.universe.Symbol, Tree]
+    ) extends Transformer {
       override def transform(tree: Tree): Tree = {
 
         tree match {
           case Ident(_) => m.getOrElse(tree.symbol, tree)
           case tt: TypeTree if tt.original != null =>
-            super.transform(c.universe.internal.setOriginal(TypeTree(), super.transform(tt.original)))
+            super.transform(
+              c.universe.internal
+                .setOriginal(TypeTree(), super.transform(tt.original)))
           case tt: TypeTree if tt.original == null =>
             if (tt.children.isEmpty &&
-              m.keys.exists( key => tt.tpe.contains(key))) {
+                m.keys.exists(key => tt.tpe.contains(key))) {
               debug(s"${showRaw(tree)}")
               debug(s"${showRaw(tree.tpe)}")
               debug(s"${tree.tpe}")
-
 
               /**
                 * Recursively construct a Tree from a Type
@@ -462,8 +537,8 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
                 *            TermName("R"))
                 *         Returns null if the param is not a path-dependent type
                 */
-              def constructOriginal(tp: c.Type) : c.Tree = {
-                def matchTypeName(tn: c.Symbol) : c.TypeName =  {
+              def constructOriginal(tp: c.Type): c.Tree = {
+                def matchTypeName(tn: c.Symbol): c.TypeName = {
                   tn match {
                     case TypeSymbolTag(ts) => {
                       ts.name.toTypeName
@@ -471,9 +546,10 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
                     case _ => null
                   }
                 }
-                def matchTermNameNoPrefixCase(tn: c.Symbol) : Tree =  m.getOrElse(tn, null)
+                def matchTermNameNoPrefixCase(tn: c.Symbol): Tree =
+                  m.getOrElse(tn, null)
 
-                def matchTermName(tn: c.Symbol) : TermName =  {
+                def matchTermName(tn: c.Symbol): TermName = {
                   tn match {
                     case TermSymbolTag(ts) => ts.name.toTermName
                     case _ => null
@@ -487,8 +563,7 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
                       val tr_rec = constructOriginal(tr)
                       if (tr_rec != null) Select(tr_rec, tnsTypeName)
                       else null
-                    }
-                    else null
+                    } else null
                   case SingleType(NoPrefix, tns) =>
                     matchTermNameNoPrefixCase(tns)
                   case SingleType(pre, tns) =>
@@ -501,13 +576,13 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
               }
 
               val new_orig = constructOriginal(tree.tpe)
-              val res = if (new_orig != null)
+              val res =
+                if (new_orig != null)
                   c.universe.internal.setOriginal(TypeTree(), new_orig)
                 else
                   tree
               res
-            }
-            else tree
+            } else tree
           case _ => super.transform(tree)
         }
       }
@@ -515,15 +590,19 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
     new TypeTransformer(m).transform(_: Tree)
   }
 
-  def toTuple(lst: List[c.Tree]) : c.Tree = {
+  def toTuple(lst: List[c.Tree]): c.Tree = {
     if (lst.size == 1) lst(0)
     else if (lst.size == 2) q"(${lst(0)}, ${lst(1)})"
     else if (lst.size == 3) q"(${lst(0)}, ${lst(1)}, ${lst(2)})"
     else if (lst.size == 4) q"(${lst(0)}, ${lst(1)}, ${lst(2)}, ${lst(3)})"
-    else if (lst.size == 5) q"(${lst(0)}, ${lst(1)}, ${lst(2)}, ${lst(3)}, ${lst(4)})"
-    else if (lst.size == 6) q"(${lst(0)}, ${lst(1)}, ${lst(2)}, ${lst(3)}, ${lst(4)}, ${lst(5)})"
-    else if (lst.size == 7) q"(${lst(0)}, ${lst(1)}, ${lst(2)}, ${lst(3)}, ${lst(4)}, ${lst(5)}, ${lst(6)})"
-    else if (lst.size == 8) q"(${lst(0)}, ${lst(1)}, ${lst(2)}, ${lst(3)}, ${lst(4)}, ${lst(5)}, ${lst(6)}, ${lst(7)})"
+    else if (lst.size == 5)
+      q"(${lst(0)}, ${lst(1)}, ${lst(2)}, ${lst(3)}, ${lst(4)})"
+    else if (lst.size == 6)
+      q"(${lst(0)}, ${lst(1)}, ${lst(2)}, ${lst(3)}, ${lst(4)}, ${lst(5)})"
+    else if (lst.size == 7)
+      q"(${lst(0)}, ${lst(1)}, ${lst(2)}, ${lst(3)}, ${lst(4)}, ${lst(5)}, ${lst(6)})"
+    else if (lst.size == 8) q"(${lst(0)}, ${lst(1)}, ${lst(2)}, ${lst(3)}, ${lst(
+      4)}, ${lst(5)}, ${lst(6)}, ${lst(7)})"
     else ???
   }
 
@@ -532,7 +611,7 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
        val x = outer
        (y: T) => { ... }
      }
-   */
+    */
   def check(funTree: c.Tree, ttpe: c.Type, rtpe: c.Type): c.Tree = {
     debug(s"SPORES: enter check, tree:\n$funTree")
 
@@ -545,16 +624,24 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
       val id = Ident(applyParamName)
       val applyName = TermName("apply")
 
-      val applyParamValDef = ValDef(Modifiers(Flag.PARAM), applyParamName, TypeTree(paramSym.typeSignature), EmptyTree)
+      val applyParamValDef = ValDef(Modifiers(Flag.PARAM),
+                                    applyParamName,
+                                    TypeTree(paramSym.typeSignature),
+                                    EmptyTree)
       val sporeClassName = c.freshName(anonSporeName)
 
       if (validEnv.isEmpty) {
-        val newFunBody = transformTypes(Map(paramSym -> id)) (funBody)
+        val newFunBody = transformTypes(Map(paramSym -> id))(funBody)
         val nfBody = c.untypecheck(newFunBody.asInstanceOf[c.universe.Tree])
 
         val applyDefDef: DefDef = {
           val applyVParamss = List(List(applyParamValDef))
-          DefDef(NoMods, applyName, Nil, applyVParamss, TypeTree(retTpe), nfBody)
+          DefDef(NoMods,
+                 applyName,
+                 Nil,
+                 applyVParamss,
+                 TypeTree(retTpe),
+                 nfBody)
         }
 
         q"""
@@ -574,18 +661,31 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
 
         val symsToReplace = paramSym :: validEnv
         val newTrees =
-          if (validEnv.size == 1) List(Select(Ident(TermName("self")), TermName("captured")))
-          else (1 to validEnv.size).map(i => Select(Select(Ident(TermName("self")), TermName("captured")), TermName(s"_$i"))).toList
+          if (validEnv.size == 1)
+            List(Select(Ident(TermName("self")), TermName("captured")))
+          else
+            (1 to validEnv.size)
+              .map(
+                i =>
+                  Select(Select(Ident(TermName("self")), TermName("captured")),
+                         TermName(s"_$i")))
+              .toList
 
         val treesToSubstitute = id :: newTrees
         val symsToTrees = symsToReplace.zip(treesToSubstitute).toMap
-        val namesToTrees = symsToReplace.map(_.name.toString).zip(treesToSubstitute).toMap
-        val newFunBody = transformTypes(symsToTrees) (funBody)
+        val namesToTrees =
+          symsToReplace.map(_.name.toString).zip(treesToSubstitute).toMap
+        val newFunBody = transformTypes(symsToTrees)(funBody)
 
         val nfBody = c.untypecheck(newFunBody.asInstanceOf[c.universe.Tree])
         val applyDefDef: DefDef = {
           val applyVParamss = List(List(applyParamValDef))
-          DefDef(NoMods, applyName, Nil, applyVParamss, TypeTree(retTpe), nfBody)
+          DefDef(NoMods,
+                 applyName,
+                 Nil,
+                 applyVParamss,
+                 TypeTree(retTpe),
+                 nfBody)
         }
 
         val rhss = funTree match {
@@ -605,17 +705,33 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
         val constructorParams = List(List(toTuple(rhss)))
         val superclassName = TypeName("SporeWithEnv")
 
-        val capturedTypeDefinition = (if (capturedTypes.size == 1) q"type Captured = ${capturedTypes(0)}"
-          else if (capturedTypes.size == 2) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)})"
-          else if (capturedTypes.size == 3) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)})"
-          else if (capturedTypes.size == 4) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)})"
-          else if (capturedTypes.size == 5) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)}, ${capturedTypes(4)})"
-          else if (capturedTypes.size == 6) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)}, ${capturedTypes(4)}, ${capturedTypes(5)})"
-          else if (capturedTypes.size == 7) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)}, ${capturedTypes(4)}, ${capturedTypes(5)}, ${capturedTypes(6)})"
-          else if (capturedTypes.size == 8) q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)}, ${capturedTypes(3)}, ${capturedTypes(4)}, ${capturedTypes(5)}, ${capturedTypes(6)}, ${capturedTypes(7)})").asInstanceOf[c.Tree]
+        val capturedTypeDefinition =
+          (if (capturedTypes.size == 1) q"type Captured = ${capturedTypes(0)}"
+           else if (capturedTypes.size == 2)
+             q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)})"
+           else if (capturedTypes.size == 3)
+             q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(2)})"
+           else if (capturedTypes.size == 4)
+             q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(
+               2)}, ${capturedTypes(3)})"
+           else if (capturedTypes.size == 5)
+             q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(
+               2)}, ${capturedTypes(3)}, ${capturedTypes(4)})"
+           else if (capturedTypes.size == 6)
+             q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(
+               2)}, ${capturedTypes(3)}, ${capturedTypes(4)}, ${capturedTypes(5)})"
+           else if (capturedTypes.size == 7)
+             q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(
+               2)}, ${capturedTypes(3)}, ${capturedTypes(4)}, ${capturedTypes(
+               5)}, ${capturedTypes(6)})"
+           else if (capturedTypes.size == 8)
+             q"type Captured = (${capturedTypes(0)}, ${capturedTypes(1)}, ${capturedTypes(
+               2)}, ${capturedTypes(3)}, ${capturedTypes(4)}, ${capturedTypes(
+               5)}, ${capturedTypes(6)}, ${capturedTypes(7)})")
+            .asInstanceOf[c.Tree]
 
         val q"type $_ = $capturedTypeTree" = capturedTypeDefinition
-        
+
         q"""
           class $sporeClassName(val captured : $capturedTypeTree) extends $superclassName[$ttpe, $rtpe] {
             self =>

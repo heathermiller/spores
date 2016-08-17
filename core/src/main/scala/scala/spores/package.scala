@@ -10,7 +10,6 @@ package scala
 
 import scala.language.experimental.macros
 import scala.language.implicitConversions
-
 import scala.reflect.macros.whitebox.Context
 
 package object spores {
@@ -18,22 +17,24 @@ package object spores {
   def capture[T](x: T): T = x
 
   /**
-   *  Usage:
-   *
-   *  spore {
-   *    val x = outerX
-   *    val y = outerY
-   *    (p: T) => <body>
-   *  }
-   *
-   *  Check that body only accesses x, y, p, and variables local to (owned by) the
-   *  closure.
-   */
+    *  Usage:
+    *
+    *  spore {
+    *    val x = outerX
+    *    val y = outerY
+    *    (p: T) => <body>
+    *  }
+    *
+    *  Check that body only accesses x, y, p, and variables local to (owned by) the
+    *  closure.
+    */
   def spore[T, R](fun: T => R): Spore[T, R] = macro sporeImpl[T, R]
 
-  def spore[T1, T2, R](fun: (T1, T2) => R): Spore2[T1, T2, R] = macro spore2Impl[T1, T2, R]
+  def spore[T1, T2, R](fun: (T1, T2) => R): Spore2[T1, T2, R] =
+    macro spore2Impl[T1, T2, R]
 
-  def spore[T1, T2, T3, R](fun: (T1, T2, T3) => R): Spore3[T1, T2, T3, R] = macro spore3Impl[T1, T2, T3, R]
+  def spore[T1, T2, T3, R](fun: (T1, T2, T3) => R): Spore3[T1, T2, T3, R] =
+    macro spore3Impl[T1, T2, T3, R]
 
   def spore[R](fun: Function0[R]): NullarySpore[R] = macro nullarySporeImpl[R]
 
@@ -44,17 +45,20 @@ package object spores {
   }
 
   // TOGGLE DEBUGGING
-  private val isDebugEnabled = System.getProperty("spores.debug", "false").toBoolean
+  private val isDebugEnabled =
+    System.getProperty("spores.debug", "false").toBoolean
   private[spores] def debug(s: => String): Unit =
     if (isDebugEnabled) println(s)
 
-  def nullarySporeImpl[R: c.WeakTypeTag](c: Context)(fun: c.Expr[Function0[R]]): c.Expr[NullarySpore[R]] = {
+  def nullarySporeImpl[R: c.WeakTypeTag](c: Context)(
+      fun: c.Expr[Function0[R]]): c.Expr[NullarySpore[R]] = {
     val impl = new MacroImpl[c.type](c)
     val tree = impl.checkNullary(fun.tree, c.universe.weakTypeOf[R])
     c.Expr[NullarySpore[R]](tree)
   }
 
-  def sporeImpl[T: c.WeakTypeTag, R: c.WeakTypeTag](c: Context)(fun: c.Expr[T => R]): c.Expr[Spore[T, R]] = {
+  def sporeImpl[T: c.WeakTypeTag, R: c.WeakTypeTag](c: Context)(
+      fun: c.Expr[T => R]): c.Expr[Spore[T, R]] = {
     import c.universe._
 
     // check Spore constraints
@@ -65,22 +69,30 @@ package object spores {
     c.Expr[Spore[T, R]](tree)
   }
 
-  def spore2Impl[T1: c.WeakTypeTag, T2: c.WeakTypeTag, R: c.WeakTypeTag](c: Context)(fun: c.Expr[(T1, T2) => R]): c.Expr[Spore2[T1, T2, R]] = {
+  def spore2Impl[T1: c.WeakTypeTag, T2: c.WeakTypeTag, R: c.WeakTypeTag](
+      c: Context)(fun: c.Expr[(T1, T2) => R]): c.Expr[Spore2[T1, T2, R]] = {
     import c.universe._
 
     // check Spore constraints
     val impl = new MacroImpl[c.type](c)
-    val tree = impl.check2(fun.tree, List(weakTypeOf[R], weakTypeOf[T1], weakTypeOf[T2]))
+    val tree = impl
+      .check2(fun.tree, List(weakTypeOf[R], weakTypeOf[T1], weakTypeOf[T2]))
 
     c.Expr[Spore2[T1, T2, R]](tree)
   }
 
-  def spore3Impl[T1: c.WeakTypeTag, T2: c.WeakTypeTag, T3: c.WeakTypeTag, R: c.WeakTypeTag](c: Context)(fun: c.Expr[(T1, T2, T3) => R]): c.Expr[Spore3[T1, T2, T3, R]] = {
+  def spore3Impl[T1: c.WeakTypeTag,
+                 T2: c.WeakTypeTag,
+                 T3: c.WeakTypeTag,
+                 R: c.WeakTypeTag](c: Context)(
+      fun: c.Expr[(T1, T2, T3) => R]): c.Expr[Spore3[T1, T2, T3, R]] = {
     import c.universe._
 
     // check Spore constraints
     val impl = new MacroImpl[c.type](c)
-    val tree = impl.check2(fun.tree, List(weakTypeOf[R], weakTypeOf[T1], weakTypeOf[T2], weakTypeOf[T3]))
+    val tree = impl.check2(
+      fun.tree,
+      List(weakTypeOf[R], weakTypeOf[T1], weakTypeOf[T2], weakTypeOf[T3]))
 
     c.Expr[Spore3[T1, T2, T3, R]](tree)
   }
@@ -112,7 +124,9 @@ package object spores {
               List()
           }
         }
-        validVarSyms foreach { p => debug("valid: " + p) }
+        validVarSyms foreach { p =>
+          debug("valid: " + p)
+        }
         (validVarSyms, expr)
 
       case expr =>
@@ -121,11 +135,10 @@ package object spores {
 
     funLiteral match {
       case fun @ Function(vparams, body) =>
-
         def isSymbolValid(s: Symbol): Boolean =
           validEnv.map(_._1).contains(s) ||
-          s.owner == fun.symbol ||
-          s.isStatic || {
+            s.owner == fun.symbol ||
+            s.isStatic || {
             c.error(s.pos, "invalid reference to " + s)
             false
           }
@@ -165,7 +178,8 @@ package object spores {
   // sketch involved with type constraints, probably unneeded
   def sporeWith[T, R](fun: T => R): Spore[T, R] = macro sporeTcImpl[T, R]
 
-  def sporeTcImpl[T: c.WeakTypeTag, R: c.WeakTypeTag](c: Context)(fun: c.Expr[T => R]): c.Expr[Spore[T, R]] = {
+  def sporeTcImpl[T: c.WeakTypeTag, R: c.WeakTypeTag](c: Context)(
+      fun: c.Expr[T => R]): c.Expr[Spore[T, R]] = {
     import c.universe._
 
     // check Spore constraints

@@ -7,11 +7,19 @@ import scala.language.experimental.macros
 /**
   * Implicit conversion between spores and spores with excluded types.
   */
-object SporeConv{
-  implicit def sporeConv[T, R, A] (s: Spore[T, R]) : Spore[T, R] {type Excluded = A} = macro SporeConvImpl.convImplSpore[T, R, A]
-  implicit def sporeConv[R, A] (s: NullarySpore[R]) : NullarySpore[ R] {type Excluded = A} = macro SporeConvImpl.convImplNullary[R, A]
-  implicit def sporeConv[T1, T2, R, A] (s: Spore2[T1, T2, R]) : Spore2[T1, T2, R] {type Excluded = A} = macro SporeConvImpl.convImplSpore2[T1, T2, R, A]
-  implicit def sporeConv[T1, T2, T3, R, A] (s: Spore3[T1, T2, T3, R]) : Spore3[T1, T2, T3, R] {type Excluded = A} = macro SporeConvImpl.convImplSpore3[T1, T2, T3, R, A]
+object SporeConv {
+  implicit def sporeConv[T, R, A](s: Spore[T, R]): Spore[T, R] {
+    type Excluded = A
+  } = macro SporeConvImpl.convImplSpore[T, R, A]
+  implicit def sporeConv[R, A](s: NullarySpore[R]): NullarySpore[R] {
+    type Excluded = A
+  } = macro SporeConvImpl.convImplNullary[R, A]
+  implicit def sporeConv[T1, T2, R, A](
+      s: Spore2[T1, T2, R]): Spore2[T1, T2, R] { type Excluded = A } =
+    macro SporeConvImpl.convImplSpore2[T1, T2, R, A]
+  implicit def sporeConv[T1, T2, T3, R, A](
+      s: Spore3[T1, T2, T3, R]): Spore3[T1, T2, T3, R] { type Excluded = A } =
+    macro SporeConvImpl.convImplSpore3[T1, T2, T3, R, A]
 
 }
 
@@ -33,17 +41,17 @@ object SporeConvImpl {
     *            new anonclass(...) { type Excluded = (...) }
     *          }
     */
-  def constructTree[A: c.WeakTypeTag] (c: Context) (s: c.Tree) : c.universe.Tree = {
+  def constructTree[A: c.WeakTypeTag](c: Context)(s: c.Tree): c.universe.Tree = {
     import c.universe._
     val atpe = weakTypeOf[A]
 
     // creates a list of types that appear in A (currently only up to 6 excluded types)
-    val avoidedList : List[c.universe.Type] = {
+    val avoidedList: List[c.universe.Type] = {
       if (atpe <:< weakTypeOf[(Any, Any)] ||
-        atpe <:< weakTypeOf[(Any, Any, Any)] ||
-        atpe <:< weakTypeOf[(Any, Any, Any, Any)] ||
-        atpe <:< weakTypeOf[(Any, Any, Any, Any, Any)] ||
-        atpe <:< weakTypeOf[(Any, Any, Any, Any, Any, Any)])
+          atpe <:< weakTypeOf[(Any, Any, Any)] ||
+          atpe <:< weakTypeOf[(Any, Any, Any, Any)] ||
+          atpe <:< weakTypeOf[(Any, Any, Any, Any, Any)] ||
+          atpe <:< weakTypeOf[(Any, Any, Any, Any, Any, Any)])
         atpe.typeArgs
       else List[c.universe.Type](atpe)
     }
@@ -51,7 +59,7 @@ object SporeConvImpl {
     // goes through a tree and produces a list of TypeTree:s that appear in the tree
     object traverser extends Traverser {
       var mentionedTypes = List[TypeTree]()
-      override def traverse(tree: Tree) : Unit = tree match {
+      override def traverse(tree: Tree): Unit = tree match {
         case tt @ TypeTree() => mentionedTypes = tt :: mentionedTypes
         case _ => super.traverse(tree)
       }
@@ -66,28 +74,31 @@ object SporeConvImpl {
 
     /* This is the check: compiler error if some TypeTree
        in 's' has a type that is <:< of something in A */
-    traverser.mentionedTypes.foreach(t =>
-      avoidedList.foreach(at =>
-        if (t.tpe <:< at && !isBottomType(t.tpe, at))
-          c.error(t.pos, s"Expression has type '${t.tpe}', but type '$at' is Excluded")
-    ))
+    traverser.mentionedTypes.foreach(
+      t =>
+        avoidedList.foreach(at =>
+          if (t.tpe <:< at && !isBottomType(t.tpe, at))
+            c.error(
+              t.pos,
+              s"Expression has type '${t.tpe}', but type '$at' is Excluded")))
 
     /* divides 's' into pieces that are put together
        to create a Spore[...] {type Excluded = ...} */
     val Block(l, new_instance) = s
-    var class_def : Tree = null
+    var class_def: Tree = null
 
-    l.foreach((t: Tree) => t match {
-      case ClassDef(_, _, _, _) =>
-        class_def = t
-      case _ =>
+    l.foreach((t: Tree) =>
+      t match {
+        case ClassDef(_, _, _, _) =>
+          class_def = t
+        case _ =>
     })
 
     require(class_def != null)
 
     val q"new $_(...$class_constructor_args)" = new_instance
     val class_def_sym = class_def.symbol
-    val new_tree =q"""
+    val new_tree = q"""
       $class_def
       new $class_def_sym(...$class_constructor_args) {type Excluded = $atpe}
       """
@@ -97,23 +108,36 @@ object SporeConvImpl {
     new_tree
   }
 
-  def convImplNullary[R: c.WeakTypeTag, A: c.WeakTypeTag] (c : Context) (s: c.Expr[NullarySpore[R]]) :
-  c.Expr[NullarySpore[R] {type Excluded = A}] = {
-    c.Expr[NullarySpore[R] {type Excluded = A}] (constructTree[A](c)(s.tree))
+  def convImplNullary[R: c.WeakTypeTag, A: c.WeakTypeTag](c: Context)(
+      s: c.Expr[NullarySpore[R]])
+    : c.Expr[NullarySpore[R] { type Excluded = A }] = {
+    c.Expr[NullarySpore[R] { type Excluded = A }](constructTree[A](c)(s.tree))
   }
 
-  def convImplSpore[T: c.WeakTypeTag, R: c.WeakTypeTag, A: c.WeakTypeTag] (c : Context) (s: c.Expr[Spore[T, R]]) :
-      c.Expr[Spore[T, R] {type Excluded = A}] = {
-    c.Expr[Spore[T, R] {type Excluded = A}](constructTree[A](c)(s.tree))
+  def convImplSpore[T: c.WeakTypeTag, R: c.WeakTypeTag, A: c.WeakTypeTag](
+      c: Context)(
+      s: c.Expr[Spore[T, R]]): c.Expr[Spore[T, R] { type Excluded = A }] = {
+    c.Expr[Spore[T, R] { type Excluded = A }](constructTree[A](c)(s.tree))
   }
 
-  def convImplSpore2[T1: c.WeakTypeTag, T2: c.WeakTypeTag, R: c.WeakTypeTag, A: c.WeakTypeTag] (c : Context) (s: c.Expr[Spore2[T1, T2, R]]) :
-  c.Expr[Spore2[T1, T2, R] {type Excluded = A}] = {
-    c.Expr[Spore2[T1, T2, R] {type Excluded = A}](constructTree[A](c)(s.tree))
+  def convImplSpore2[T1: c.WeakTypeTag,
+                     T2: c.WeakTypeTag,
+                     R: c.WeakTypeTag,
+                     A: c.WeakTypeTag](c: Context)(
+      s: c.Expr[Spore2[T1, T2, R]])
+    : c.Expr[Spore2[T1, T2, R] { type Excluded = A }] = {
+    c.Expr[Spore2[T1, T2, R] { type Excluded = A }](
+      constructTree[A](c)(s.tree))
   }
 
-  def convImplSpore3[T1: c.WeakTypeTag, T2: c.WeakTypeTag, T3: c.WeakTypeTag, R: c.WeakTypeTag, A: c.WeakTypeTag] (c : Context) (s: c.Expr[Spore3[T1, T2, T3, R]]) :
-  c.Expr[Spore3[T1, T2, T3, R] {type Excluded = A}] = {
-    c.Expr[Spore3[T1, T2, T3, R] {type Excluded = A}](constructTree[A](c)(s.tree))
+  def convImplSpore3[T1: c.WeakTypeTag,
+                     T2: c.WeakTypeTag,
+                     T3: c.WeakTypeTag,
+                     R: c.WeakTypeTag,
+                     A: c.WeakTypeTag](c: Context)(
+      s: c.Expr[Spore3[T1, T2, T3, R]])
+    : c.Expr[Spore3[T1, T2, T3, R] { type Excluded = A }] = {
+    c.Expr[Spore3[T1, T2, T3, R] { type Excluded = A }](
+      constructTree[A](c)(s.tree))
   }
 }
