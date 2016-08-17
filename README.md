@@ -28,16 +28,16 @@ on Maven Central and Sonatype. You can use Spores in your sbt project by
 simply adding the following dependency to your build file:
 
 ```scala
-libraryDependencies += "org.scala-lang.modules" %% "spores-core" % "0.1.3"
+libraryDependencies += "org.scala-lang.modules" %% "spores-core" % "0.2.4"
 ```
 
 To enable integration with Pickling, add the following dependency:
 
 ```scala
-libraryDependencies += "org.scala-lang.modules" %% "spores-pickling" % "0.1.3"
+libraryDependencies += "org.scala-lang.modules" %% "spores-pickling" % "0.2.4"
 ```
 
-Or you can just directly download the jar files ([spores-core](http://search.maven.org/remotecontent?filepath=org/scala-lang/modules/spores-core_2.11/0.1.3/spores-core_2.11-0.1.3.jar), [spores-pickling](http://search.maven.org/remotecontent?filepath=org/scala-lang/modules/spores-pickling_2.11/0.1.3/spores-pickling_2.11-0.1.3.jar)).
+Or you can just directly download the jar files ([spores-core](http://search.maven.org/remotecontent?filepath=org/scala-lang/modules/spores-core_2.11/0.2.4/spores-core_2.11-0.2.4.jar), [spores-pickling](http://search.maven.org/remotecontent?filepath=org/scala-lang/modules/spores-pickling_2.11/0.2.4/spores-pickling_2.11-0.2.4.jar)).
 
 ## Updates since the first draft (June 16th, 2013) of SIP-21
 
