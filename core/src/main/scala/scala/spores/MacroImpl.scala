@@ -8,9 +8,10 @@
 
 package scala.spores
 
-import scala.reflect.macros.whitebox.Context
+// TODO(jvican): Can we just use blackbox?
+import scala.reflect.macros.whitebox
 
-private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
+private[spores] class MacroImpl[C <: whitebox.Context with Singleton](val c: C) {
   import c.universe._
 
   /* Don't change this name since it's used
@@ -41,24 +42,10 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
   }
 
   def conforms(funTree: c.Tree): (List[Symbol], Type, Tree, List[Symbol]) = {
-    // traverse body of `fun` and check that the free vars access only allowed things
-    // `validEnv` == symbols declared in the spore header
-    val (validEnv, funLiteral) = funTree match {
-      case Block(stmts, expr) =>
-        val validVarSyms = stmts.toList flatMap {
-          case vd @ ValDef(mods, name, tpt, rhs) =>
-            List(vd.symbol)
-          case stmt =>
-            c.error(stmt.pos, "Only val defs allowed at this position")
-            List()
-        }
-        validVarSyms foreach { sym =>
-          debug("valid: " + sym)
-        }
-        (validVarSyms, expr)
-
-      case expr =>
-        (List(), expr)
+    val analysis = new SporeAnalysis[c.type](c)
+    val (validEnv, funLiteral) = analysis.stripSporeStructure(funTree)
+    validEnv foreach { sym =>
+      debug("valid: " + sym)
     }
 
     val captureSym = typeOf[spores.`package`.type].member(TermName("capture"))
