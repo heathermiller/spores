@@ -18,129 +18,27 @@ private[spores] class MacroImpl[C <: whitebox.Context with Singleton](val c: C) 
    * to check if a class is indeed a spore */
   val anonSporeName = TypeName("anonspore")
 
-  /** Checks whether the owner chain of `sym` contains `owner`.
-    *
-    * @param sym   the symbol to be checked
-    * @param owner the owner symbol that we try to find
-    * @return      whether `owner` is a direct or indirect owner of `sym`
-    */
-  def isOwner(sym: Symbol, owner: Symbol): Boolean = {
-    sym != null && (sym.owner == owner || {
-      sym.owner != NoSymbol && isOwner(sym.owner, owner)
-    })
-  }
-
-  /** Checks whether `member` is selected from a static selector, or whether
-    * its selector is transitively selected from a static symbol.
-    */
-  def isStaticSelector(member: Tree): Boolean = member match {
-    case Select(selector, member0) =>
-      val selStatic = selector.symbol.isStatic
-      debug(s"checking whether $selector is static...$selStatic")
-      selStatic || isStaticSelector(selector)
-    case _ => false
-  }
-
-  val SporesDefinition = typeOf[spores.`package`.type]
-
   def conforms(funTree: c.Tree): (List[Symbol], Type, Tree, List[Symbol]) = {
     val analysis = new SporeAnalysis[c.type](c)
-    val (sporeEnv, sporeBody) = analysis.stripSporeStructure(funTree)
-    sporeEnv foreach (sym => debug(s"valid: $sym"))
+    val (sporeEnv, sporeFunDef) = analysis.stripSporeStructure(funTree)
+    sporeEnv foreach (sym => debug(s"Valid captured symbol: $sym"))
 
-    val captureSym = SporesDefinition.member(TermName("capture"))
-    val (funOpt, vparams, body) = analysis.readSporeBody(sporeBody)
+    val (funOpt, vparams, sporeBody) = analysis.readSporeFunDef(sporeFunDef)
+    val captured = analysis.collectCaptured(sporeBody, funOpt)
+    val declared = analysis.collectDeclared(sporeBody)
+    val symbol = funOpt.map(_.symbol)
+    val checker =
+      new SporeChecker[c.type](c)(sporeEnv, symbol, captured, declared)
 
-    // contains all symbols found in `capture` syntax
-    var capturedSyms = List[Symbol]()
-    var declaredSyms = List[Symbol]()
-
-    // is the use of symbol s allowed via spore rules? (in the spore body)
-    def isSymbolValid(s: Symbol): Boolean =
-      sporeEnv.contains(s) || // is `s` declared in the spore header?
-        capturedSyms.contains(s) || // is `s` captured using the `capture` syntax?
-        funOpt.exists(f => isOwner(s, f.symbol)) || // is `s` declared within `fun`?
-        declaredSyms.contains(s) ||
-        s == NoSymbol || // is `s` == `_`?
-        s.isStatic ||
-        s.owner == definitions.PredefModule
-
-    // is tree t a path with only components that satisfy pred? (eg stable or lazy)
-    def isPathWith(t: Tree)(pred: TermSymbol => Boolean): Boolean = t match {
-      case sel @ Select(s, _) =>
-        isPathWith(s)(pred) && pred(sel.symbol.asTerm)
-      case id: Ident =>
-        pred(id.symbol.asTerm)
-      case th: This =>
-        true
-      // we can't seem to have a super in paths because of S-1938, pity
-      // https://issues.scala-lang.org/browse/SI-1938
-      // case supr: Super =>
-      //   true
-      case _ =>
-        false
-    }
-
-    def isPathValid(tree: Tree): (Boolean, Option[Tree]) = {
-      debug(s"checking isPathValid for $tree [${tree.symbol}]...")
-      debug(s"tree class: ${tree.getClass.getName}")
-      if (tree.symbol != null && isSymbolValid(tree.symbol)) (true, None)
-      else
-        tree match {
-          case Select(pre, sel) =>
-            debug(s"case 1: Select($pre, $sel)")
-            isPathValid(pre)
-          case Apply(Select(pre, _), _) =>
-            debug(s"case 2: Apply(Select, _)")
-            isPathValid(pre)
-          case TypeApply(Select(pre, _), _) =>
-            debug("case 3: TypeApply(Select, _)")
-            isPathValid(pre)
-          case TypeApply(fun, _) =>
-            debug("case 4: TypeApply")
-            isPathValid(fun)
-          case Literal(Constant(_)) | New(_) =>
-            (true, None)
-          case id: Ident =>
-            (isSymbolValid(id.symbol), None)
-          case _ =>
-            debug("case 7: _")
-            (false, Some(tree))
-        }
-    }
-
-    // traverse the spore body and collect symbols in `capture` invocations
-    val collectCapturedTraverser = new Traverser {
-      override def traverse(tree: Tree): Unit = tree match {
-        case app @ Apply(fun, List(captured)) if (fun.symbol == captureSym) =>
-          debug("found capture: " + app)
-          if (!isPathWith(captured)(_.isStable))
-            c.error(captured.pos, "Only stable paths can be captured")
-          else if (!isPathWith(captured)(!_.isLazy))
-            c.error(captured.pos,
-                    "A captured path cannot contain lazy members")
-          else
-            capturedSyms ::= captured.symbol
-        case _ =>
-          super.traverse(tree)
-      }
-    }
-    debug("collecting captured symbols")
-    collectCapturedTraverser.traverse(body)
-
-    debug(s"checking $body...")
+    debug(s"Checking $sporeBody...")
     // check the spore body, i.e., for each identifier, check that it is valid according to spore rules
     // i.e., either declared locally or captured via a `capture` invocation
     val traverser = new Traverser {
       override def traverse(tree: Tree) {
         tree match {
-          case vd @ ValDef(mods, name, tpt, rhs) =>
-            super.traverse(tree)
-            declaredSyms = vd.symbol :: declaredSyms
-
           case id: Ident =>
             debug("checking ident " + id)
-            if (!isSymbolValid(id.symbol))
+            if (!checker.isSymbolValid(id.symbol))
               c.error(tree.pos, "invalid reference to " + id.symbol)
 
           case th: This =>
@@ -154,14 +52,15 @@ private[spores] class MacroImpl[C <: whitebox.Context with Singleton](val c: C) 
             } else
               fun0 match {
                 case Select(obj, _) =>
-                  if (funOpt.exists(f => isOwner(obj.symbol, f.symbol)))
+                  if (funOpt.exists(
+                        f => checker.isOwner(obj.symbol, f.symbol)))
                     debug(s"OK, selected on local object $obj")
                   else {
                     // the invocation is OK if `obj` is transitively selected from a top-level object
                     debug(
                       s"checking whether $obj is transitively selected from a top-level object...")
-                    val objIsStatic = obj.symbol.isStatic || isStaticSelector(
-                        obj)
+                    val objIsStatic = obj.symbol.isStatic || checker
+                        .isStaticSelector(obj)
                     debug(s"$obj.symbol.isStatic: $objIsStatic")
                     if (!objIsStatic)
                       c.error(sel.pos,
@@ -175,7 +74,7 @@ private[spores] class MacroImpl[C <: whitebox.Context with Singleton](val c: C) 
           case sel @ Select(pre, _) =>
             debug("checking select " + sel)
 
-            isPathValid(sel) match {
+            checker.isPathValid(sel) match {
               case (false, None) =>
                 c.error(tree.pos, "invalid reference to " + sel.symbol)
               case (false, Some(subtree)) =>
@@ -192,8 +91,8 @@ private[spores] class MacroImpl[C <: whitebox.Context with Singleton](val c: C) 
       }
     }
 
-    traverser.traverse(body)
-    (vparams.map(_.symbol), body.tpe, body, sporeEnv)
+    traverser.traverse(sporeBody)
+    (vparams.map(_.symbol), sporeBody.tpe, sporeBody, sporeEnv)
   }
 
   def check2(funTree: c.Tree, tpes: List[c.Type]): c.Tree = {
