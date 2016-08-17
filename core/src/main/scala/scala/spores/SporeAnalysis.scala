@@ -7,7 +7,7 @@ protected class SporeAnalysis[C <: whitebox.Context with Singleton](val ctx: C) 
   import ctx.universe._
   import ctx.universe.Flag._
 
-  def stripSporeStructure(tree: Tree): (List[Symbol], ctx.Tree) = {
+  def stripSporeStructure(tree: Tree): (List[Symbol], Tree) = {
     def isCorrectHeader(valDef: ValDef) = !valDef.mods.hasFlag(MUTABLE)
 
     tree match {
@@ -17,6 +17,18 @@ protected class SporeAnalysis[C <: whitebox.Context with Singleton](val ctx: C) 
           case stmt => ctx.abort(stmt.pos, Feedback.IncorrectSporeHeader)
         }) -> expr
       case expr => (List.empty, expr)
+    }
+  }
+
+  val SporesDefinition = typeOf[spores.`package`.type]
+  val delayedSym = SporesDefinition.member(TermName("delayed"))
+
+  def readSporeBody(tree: Tree): (Option[Function], List[Tree], Tree) = {
+    tree match {
+      case f @ Function(params, body) => (Some(f), params, body) // Non-nullary
+      case Apply(f, List(arg))
+        if f.symbol == delayedSym => (None, List(), arg) // Nullary spore
+      case _ => ctx.abort(tree.pos, Feedback.IncorrectSporeBody)
     }
   }
 
