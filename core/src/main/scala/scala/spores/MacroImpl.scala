@@ -221,7 +221,7 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
 
     val (paramSyms, retTpe, funBody, validEnv) = conforms(funTree)
 
-    val applyParamNames = for (i <- 0 until paramSyms.size) yield c.freshName(TermName("x" + i))
+    val applyParamNames = for (i <- paramSyms.indices) yield c.freshName(TermName("x" + i))
     val ids = for (name <- applyParamNames.toList) yield Ident(name)
 
     val applyParamValDefs = for ((applyParamName, paramSym) <- applyParamNames.zip(paramSyms))
@@ -256,6 +256,8 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
             type Captured = scala.Nothing
             this._className = this.getClass.getName
             $applyDefDef
+
+            override def equals(o: scala.Any): Boolean = o.isInstanceOf[$sporeClassName]
           }
           new $sporeClassName
         """
@@ -266,6 +268,8 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
             type Captured = scala.Nothing
             this._className = this.getClass.getName
             $applyDefDef
+
+            override def equals(o: scala.Any): Boolean = o.isInstanceOf[$sporeClassName]
           }
           new $sporeClassName
         """
@@ -316,6 +320,13 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
               $captureTypeTreeDefinition
               this._className = this.getClass.getName
               $applyDefDef
+
+              override def equals(o: scala.Any): Boolean = {
+                o match {
+                  case other: $sporeClassName => this.captured == other.captured
+                  case _ => false
+                }
+              }
             }
             new $sporeClassName(...$constructorParams)
           """
@@ -326,6 +337,13 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
               $captureTypeTreeDefinition
               this._className = this.getClass.getName
               $applyDefDef
+
+              override def equals(o: scala.Any): Boolean = {
+                o match {
+                  case other: $sporeClassName => this.captured == other.captured
+                  case _ => false
+                }
+              }
             }
             new $sporeClassName(...$constructorParams)
           """
@@ -356,6 +374,8 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
         class $sporeClassName extends scala.spores.NullarySpore[$rtpe] {
           this._className = this.getClass.getName
           $applyDefDef
+
+          override def equals(o: scala.Any): Boolean = o.isInstanceOf[$sporeClassName]
         }
         new $sporeClassName
       """
@@ -409,6 +429,13 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
           $captureTypeTreeDefinition
           this._className = this.getClass.getName
           $applyDefDef
+
+          override def equals(o: scala.Any): Boolean = {
+            o match {
+              case other: $sporeClassName => this.captured == other.captured
+              case _ => false
+            }
+          }
         }
         new $sporeClassName(...$constructorParams)
       """
@@ -562,6 +589,8 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
             type Captured = scala.Nothing
             this._className = this.getClass.getName
             $applyDefDef
+
+            override def equals(o: scala.Any): Boolean = o.isInstanceOf[$sporeClassName]
           }
           new $sporeClassName
         """
@@ -621,6 +650,13 @@ private[spores] class MacroImpl[C <: Context with Singleton](val c: C) {
             $capturedTypeDefinition
             this._className = this.getClass.getName
             $applyDefDef
+
+            override def equals(o: scala.Any): Boolean = {
+              o match {
+                case other: $sporeClassName => this.captured == other.captured
+                case _ => false
+              }
+            }
           }
           new $sporeClassName(...$constructorParams)
         """
