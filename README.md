@@ -1,6 +1,6 @@
 # Spores
 
-Scala Spores, safe mobile closures: [SIP-21](http://docs.scala-lang.org/sips/pending/spores.html)
+Scala Spores, safe mobile closures: [SIP-21](http://docs.scala-lang.org/sips/spores.html)
 
 ## Building Spores
 
